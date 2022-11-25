@@ -28,8 +28,8 @@ struct line {
         this->x_slope = slope * !is_horz * !is_vert;
         this->y_slope = ((double)1 / slope) * !is_vert*!is_horz;
 
-        this->sgn     = sgn;
-        this->len     = len;
+        this->sgn = sgn;
+        this->len = len;
         this->reflected = reflect_line;
         this->O = O;
         this->P = P;
@@ -95,7 +95,7 @@ void draw_device::set_color(u32 color)
     }
 }
 
-void draw_device::draw_line(matrix<realnum> O, matrix<realnum> P, u32 color,bool dotted)
+void draw_device::draw_line(matrix<realnum> O, matrix<realnum> P, u32 color)
 {
 
     pt O2 = DISPLAY_CENTER + pt(O * scale); 
@@ -111,8 +111,11 @@ void draw_device::draw_circ(matrix<realnum> O, realnum r, u32 color) {
 
 inline void draw_device::draw_line_raw(pt O, pt P, u32 color)
 {
+
     line L(O, P);
-  
+
+    int len = min(L.len, DISPLAY_WIDTH)*!L.reflected + min(L.len,DISPLAY_HEIGHT)*L.reflected;
+
     for (int i = 0; i < L.len; i++) 
     {
         pt X = L.eval(i);

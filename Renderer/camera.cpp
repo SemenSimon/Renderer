@@ -15,7 +15,7 @@ camera::camera(vec normal, vec pos, realnum focal_dist)
 
 void camera::set_facing(vec normal) {
 	this->normal = R3::unitize(normal);
-	this->focal_point = pos - normal * focal_dist;
+	this->pos = focal_point + normal * focal_dist;
 	this->cam_plane = hyperplane<R3>(normal);
 }
 
@@ -50,6 +50,6 @@ void camera::set_focus(realnum focus) {
 }
 
 void camera::set_pos(vec v){
-	this->pos = v;
-	this->focal_point = v - normal * focal_dist;
+	this->pos = v + normal * focal_dist;
+	this->focal_point = v;
 }

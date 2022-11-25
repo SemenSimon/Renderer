@@ -57,7 +57,7 @@ public:
 class R3 : public coord_space<realnum, 3, inner_products::std_coord<realnum, 3>> {
 public:
 	static inline realnum ip(elem v, elem w) {
-		return (v.t() * w)[0][0];//v[0][0] * w[0][0] +
+		return (v.t() * w)[0][0];//v[0][0] * w[0][0] +			 
 			   //v[1][0] * w[1][0] + 
 			   //v[2][0] * w[2][0];
 	}
@@ -147,17 +147,6 @@ public:
 		return rotatex(alpha) * rotatey(beta) * rotatez(gamma);
 	}
 
-	static double stereographic_proj_R2(double x, double y) {
-		bool zero = (x == 0)*(y == 0);
-		double r = sqrt(pow(x, 2) + pow(y, 2));
-		return sign(x) * r *  ( asin(  (y - r) / sqrt( pow(x, 2) + pow(y - r, 2) ) )  + PI / 2.0  )*!zero;
-	}
-
-	static elem stereographic_proj_R3(elem v) {
-		double p1 = stereographic_proj_R2(v[0][0], v[2][0]);
-		double p2 = stereographic_proj_R2(v[1][0], v[2][0]);
-		return elem({ p1, p2,0 });
-	}
 };
 
 /*

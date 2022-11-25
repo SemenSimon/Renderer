@@ -42,8 +42,7 @@ public:
     void draw_line(
         matrix<realnum> O,
         matrix<realnum> P,
-        u32 color = 0xFFFFFF,
-        bool dotted = false
+        u32 color = 0xFFFFFF
     );
 
     void draw_line_raw(

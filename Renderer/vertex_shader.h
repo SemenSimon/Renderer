@@ -2,6 +2,7 @@
 #include "draw_device.h"
 #include "linked_node.h"
 #include "camera.h"
+#include <unordered_map>
 
 using vertex = linked_node<vec>;
 
@@ -43,15 +44,6 @@ public:
         bool ge_zero = (i >= 0);
         bool gt_size = (i > this->mesh_size);
         bool lt_size_neg = (i < -this->mesh_size);
-
-        //size_t begin = reinterpret_cast<size_t>(mesh_begin);
-        //size_t end = reinterpret_cast<size_t>(mesh_end);
-
-        //return reinterpret_cast<vertex*>(
-        //     ge_zero * (gt_size * (begin + i - mesh_size) + !gt_size * (begin + i)) +
-        //    !ge_zero * (lt_size_neg*(end + i + mesh_size) + !lt_size_neg*(end + i))
-        //    );
-
         if (ge_zero) {
             if (gt_size) {
                 return mesh_begin + i - mesh_size;
@@ -71,9 +63,50 @@ public:
     //fields
     vertex* mesh_begin;
     vertex* mesh_end;
+    u32 color = 0xFFFFFF;
 private:
     int mesh_size;
     vec pos;
+};
+
+class render_frame {
+
+public:
+    //constructors
+    render_frame() {}
+    render_frame(draw_device& ddev, camera& cam);
+
+    //custom data types
+    struct edge {
+        edge() {}
+        edge(vec v1, vec v2, double dist_sq = 0, u32 color = 0xFFFFFF) {
+            this->v1 = v1; 
+            this->v2 = v2; 
+            this->color = color;
+            this->dist_sq = dist_sq;
+        }
+
+        vec v1;
+        vec v2;
+        u32 color;
+        double dist_sq;
+    };
+
+    /* ---------- RENDERING PIPELINE OPERATIONS ----------- */
+    edge process_edge(vec v1, vec v2, u32 color = 0xFFFFFF);
+    void process_meshes();
+
+    /* ---------- OTHER ---------- */
+    void add_mesh(wiremesh* mesh) { this->meshes.push_back(mesh); }
+    void draw_line(vec v1, vec v2, u32 color = 0xFFFFFF);
+
+
+private:
+    
+    vector<wiremesh*> meshes; 
+    draw_device* ddev;
+    camera* cam;
+
 };
 
 class obj_3d {
@@ -93,33 +126,11 @@ public:
     void set_pos(vec new_pos);
     void set_scale(double scale);
     void transform(mat T);
-
+    template<typename func>
+    void transform(func F);
     //fields
     wiremesh mesh;
-    u32 color = 0xFFFFFF;
-
-};
-
-class render_frame {
-
-public:
-    //constructors
-    render_frame(){}
-    render_frame(draw_device& ddev, camera& cam);
-
-    //draw line
-    void draw_line(vec v1, vec v2, u32 color = 0xFFFFFF);
-
-    //draw an object from R3
-    void draw(vertex& v, u32 color = 0xFFFFFF);
-    inline void draw(wiremesh& mesh, u32 color = 0xFFFFFF) {
-        this->draw(*mesh.mesh_begin);
-    }
-    inline void draw(obj_3d& shape) { this->draw(*shape.get_mesh_begin(), shape.color); }
-
-private:
-    draw_device* ddev;
-    camera* cam;
+    void set_color(u32 color) { this->mesh.color = color; }
 
 };
 
@@ -136,9 +147,21 @@ private:
     void mesh_grid_gen(vertex*& start, int size, realnum spacing = 1);
 };
 
+class flatplane : public obj_3d {
+public:
+    flatplane(){}
+    flatplane(int size,int num_lines);
+private:
+    int size;
+};
+
 class cube : public obj_3d {
 public:
+    cube(){}
     cube(realnum side_length, vec pos = { 0,0,0 });
+    bool is_inside(vec P);
+    realnum get_side_length() { return this->side_length;};
+
 private:
     realnum side_length;
 };
@@ -197,20 +220,12 @@ inline void surface::eval(func f, realnum scale) {
     }
 }
 
-
-
-class vertex_shader {
-private:
-
-    camera* cam;
-    render_frame* rframe;
-
-    vector<obj_3d> objects;
-
-public:
-    
-    void add_obj(obj_3d obj) {
-        this->objects.push_back(obj);
+template<typename func>
+void obj_3d::transform(func F) {
+    vec pos = this->get_pos();
+    for (vertex* v = this->mesh.mesh_begin; v < this->mesh.mesh_end; v++) {
+        vec temp = v->data - pos;
+        v->data = pos + F(temp);
     }
+}
 
-};

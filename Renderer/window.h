@@ -115,12 +115,17 @@ public:
     //screen
     draw_device screen;
     render_frame rframe;
+    bool show_alert;
     
     //camera 
     camera cam;
     double FOV = 90;
-    double cam_speed = 5;
-    mat cam_rotation;
+    vec vcam_real = { 0,0,0 };
+    
+
+    //objectss
+    vector<obj_3d*> objects;
+    vector<cube*> random_cubes;
 
     //other fields
     int CLIENT_WIDTH, CLIENT_HEIGHT;
@@ -138,7 +143,9 @@ public:
     pt MOUSE_POS = pt(0, 0);
     BOOL MOVMOUSE = false;
     int SCROLL_DIST = 0;
+    int SCROLL_DIST_ABS = 0;
     std::map<u32, bool> key_presses;
+    BOOL SHOWMENU = false;
 
     //useful things for calculations
     const vec zero = vec::zero(3, 1);
@@ -147,9 +154,22 @@ public:
             {1,0,0},
             {0,1,0},
             {0,0,0} };
+    const mat proj_xz = {
+            {1,0,0},
+            {0,0,0},
+            {0,0,1} };
+    const mat proj_yz = {
+            {0,0,0},
+            {0,1,0},
+            {0,0,1} };
 
     //fucking stupid dumb bad stuff
-    double v_horz = 0;
-    double v_vert = 0;
+    vector<vec> point_field;
+    vector<u32> point_colors;
+    double field_size = 0.3;
+    
+    
+
+    
     
 };  

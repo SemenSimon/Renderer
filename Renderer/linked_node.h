@@ -97,7 +97,7 @@ public:
     template<typename func>
     void execute_func(func f);
 
-    //copy to a vector
+    //copy to a std::vector
     void copy_to(linked_node<T>*& pcopy,linked_node<T>*& pcopy_end);
 
 private:

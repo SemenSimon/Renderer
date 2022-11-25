@@ -8,6 +8,26 @@ using mat = matrix<realnum>;
 using vec = R3::elem;
 using vertex = linked_node<vec>;
 
+//root two over two
+#define ROOT2 1.41421356237309504880168872420969807856967187537694
+
+static u32 darken(u32 color, double factor) {
+    u32 R = 0, G = 0, B = 0;
+    for (int i = 0; i < 8; i++) {
+        u32 R_mask = (0x00010000 << i) & color;
+        u32 G_mask = (0x00000100 << i) & color;
+        u32 B_mask = (0x00000001 << i) & color;
+
+        R = R | R_mask >> 16;
+        G = G | G_mask >> 8;
+        B = B | B_mask;
+    }
+    R = (int)(static_cast<double>(R) * factor) << 16;
+    G = (int)(static_cast<double>(G) * factor) << 8;
+    B = (int)(static_cast<double>(B) * factor);
+    return R | G | B;
+}
+
 int CLIENT_WIDTH;
 int CLIENT_HEIGHT;
 
@@ -22,8 +42,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
         0,
         128,
         72,
-        1280,
-        720,
+        1440,
+        810,
         NULL,
         NULL)
         ) 
@@ -31,63 +51,26 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
         return 0;
     }
 
-    RenderWindow* pwin = &win;
     HWND hwnd = win.Window();
-
-    ShowWindow(win.Window(), nCmdShow);
+    ShowWindow(hwnd, nCmdShow);
     GetClipCursor(&win.c_clip_old);
 
-    //get dimensions of client window
-    CLIENT_WIDTH = win.CLIENT_WIDTH;
-    CLIENT_HEIGHT = win.CLIENT_HEIGHT;
-    pt CLIENT_CENTER = win.CLIENT_CENTER;
 
-    //object queue
-    vector<obj_3d*> objects;
+    //a few things
+    cube cube1(30, { 0,0,0});
 
-    //Initializing a bunch of stuff for the screen
-    vec center = win.screen.get_center();
-    
-    //vector stuff
-    const vec zero = vec::zero(3, 1);
-    const vec e[3] = { vec::std_basis(3,0) , vec::std_basis(3,1), vec::std_basis(3,2) };
-    const mat proj_xy = {
-            {1,0,0},
-            {0,1,0},
-            {0,0,0} };
+    win.random_cubes.push_back(&cube1);    
+    win.objects.push_back(&cube1);
 
-    //shapes
-
-    //cubes
-    double cube_size = 20;
-
-    cube cube1(cube_size,{0,0,0});
-
-    int s_size = 2;
-    //surface
-    surface s1(s_size, 10); s1.color = 0x7060C0; s1.set_pos({ 0,0,0 });
-    surface s2(10, 10); s2.color = 0xFFFF00; s2.set_pos({ 0,0,0 });
-
-    //sphere sph = sphere(10,3,{ 0,0,0 });
-    
-    objects.push_back(&cube1);
-    objects.push_back(&s2);
-    //objects.push_back(&s2);
-    //objects.push_back(&sph);
-
-    win.cam_speed = 2;
-
-    auto f = [&](double x, double y) {
-        return 20*exp(-pow(sin(x),2)-pow(y,2));
-    };
-
-
+    for (obj_3d* ob : win.objects) {
+        win.rframe.add_mesh(ob->get_mesh());
+    }
+     
     /**************** main run loop *****************/
     bool running = true;
     while (running) {
-        //set the program state
+        win.screen.set_color(0);
         win.MOVMOUSE = false;
-        win.SCROLL_DIST = 0;
 
         // Run the message loop.
         MSG msg;
@@ -98,36 +81,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
             DispatchMessage(&msg);
         }
 
+        for (cube* C : win.random_cubes) {
+            vec cube_pos = C->get_pos();
+            C->set_pos(vec({ cube_pos[0][0],cube_pos[1][0],-100*cos(win.time() - pow(cube_pos[0][0] / 70,2) - pow(cube_pos[1][0] / 70,2))}));
+        }
         //update shit
-        win.update_fields();
         win.update_cam();
-
-        //cube1.transform(win.cam_rotation);
-
-        if (win.TIME_TICKER % 15 == 0) {
-        }
-
-        //set up screen with backround 
-        win.screen.set_color(0x222222);
-
-        //actual objects
-        for (auto obj : objects) {
-            win.rframe.draw(*obj);
-        }
-        double t = win.time();
-
-       win.screen.draw_triangle(
-           win.cam.proj(cube1.mesh[0]->data),
-           win.cam.proj(cube1.mesh[1]->data),
-           win.cam.proj(cube1.mesh[2]->data),
-           0x0503F7C
-       );
-            
+        win.update_fields();
         win.draw_screen();
-
-        for (int i = 0; i < 0xFE; i++) {
-            pwin->key_presses.at(i) = false;
-        }
     }
     
     return 0;
@@ -167,20 +128,21 @@ LRESULT RenderWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
         this->handle_keydown(wParam,lParam);
         return 0;
     }
+    case WM_LBUTTONDOWN:
+    {
+        this->field_size *= 0.94;
+    }
     default:
         return DefWindowProc(m_hwnd, uMsg, wParam, lParam);
     }
     return TRUE;
 }
 
-/*
-* Initializes all fields in the window object.  Basically a constructor.
-*/
 LRESULT RenderWindow::handle_create() {
     //Initialize screen dimensions
     RECT rect;
     GetClientRect(this->m_hwnd, &rect);
-    this->CLIENT_WIDTH = rect.right - rect.left;
+    this->CLIENT_WIDTH = rect.right - rect.left - (rect.right - rect.left)/6;
     this->CLIENT_HEIGHT = rect.bottom - rect.top;
     this->CLIENT_CENTER.x = CLIENT_WIDTH / 2;
     this->CLIENT_CENTER.y = CLIENT_HEIGHT / 2;
@@ -206,13 +168,77 @@ LRESULT RenderWindow::handle_create() {
 
     this->pixel_mem = (u32*)memory;
 
-    this->screen = draw_device(pixel_mem, CLIENT_WIDTH, CLIENT_HEIGHT,10);
-    this->cam = camera({ 1,1,-0.8 }, { -50,-50,100 });
+    this->screen = draw_device(pixel_mem, CLIENT_WIDTH, CLIENT_HEIGHT,100);
+    this->cam = camera({ 1,1,-1 }, { -10,-10,30 });
     this->rframe = render_frame(this->screen, this->cam);
 
-    this->framerate = 60;
+    this->framerate = 120;
     this->FOV = 90;
 
+    //a bunch of shapes because it's cool
+    {
+        vector<int> bounds = {3, 3, 1};
+        int cube_size = 30;
+
+        for (int i = -bounds[0]; i < bounds[0]; i++) {
+            for (int j = -bounds[1]; j < bounds[1]; j++) {
+                for (int k = 0; k < bounds[2]; k++) {
+                   vec pos = vec({ (double)i, (double)j, (double)k }) * cube_size;
+                   double yes = (double)(rand() % 100) / 100;
+
+                   if (yes > 0) {
+                       cube* C = new cube(cube_size,pos);
+                       random_cubes.push_back(C);
+                       this->objects.push_back(C);
+                   }
+                }        
+            }
+        }
+    }
+
+    //stupid electron stuff
+    {
+        int size = 10;
+        double d = 0.7;
+        int res = size / d;
+
+        auto cosine = [&](vec v, vec w) {
+            return R3::ip(v, w) / (R3::norm(v) * R3::norm(w));
+        };
+        auto elec_dist = [&](vec v) {
+            auto vmag = R3::norm(v);
+
+            auto a1 = cosine({ 0,1,0 }, v);
+            auto a2 = cosine({ 1,0,0 }, v);
+            auto a3 = cosine({ 0,0,1 }, v);
+            //auto a3 = cosine({ 1,1,0 }, v);
+            auto a4 = cosine({ 1,-1,0 }, v);
+
+            return 3 * (
+                //exp(-(vmag)*field_size) +
+                exp(-(vmag)*field_size) * a1 +
+                exp(-(vmag)*field_size) * a2 +
+                exp(-(vmag)*field_size) * a3);
+        };
+
+        for (int n = -res; n < res; n++) {
+            for (int i = -res; i < res; i++) {
+                for (int j = -res; j < res; j++) {
+                    double x = rand();
+                    double y = rand();
+                    double z = rand();
+
+                    vec point = { x,y,z };
+                    point_field.push_back(point);
+                    auto brightness = elec_dist(point);
+                    bool neg = brightness < 0;
+                    u32 color = darken(0x0000FF * neg + 0xFF0000 * !neg, abs(brightness));
+                    point_colors.push_back(color);
+                }
+            }
+        }
+    }
+    
     //set up key presses
     for (int i = 0; i < 0xFE; i++) {
         key_presses.insert(pair<u32, bool>(i, false));
@@ -220,35 +246,29 @@ LRESULT RenderWindow::handle_create() {
     return TRUE;
 }
 
-LRESULT RenderWindow::handle_mouse_move(WPARAM wParam, LPARAM lParam){
-    this->MOUSE_POS.x = GET_X_LPARAM(lParam);
-    this->MOUSE_POS.y = abs(GET_Y_LPARAM(lParam) - CLIENT_HEIGHT);
-    this->MOVMOUSE = true;
-    return TRUE;
-}
-
-LRESULT RenderWindow::handle_scroll(WPARAM wParam, LPARAM lParam){
-    int zDelta = GET_WHEEL_DELTA_WPARAM(wParam);
-    this->SCROLL_DIST += zDelta;
-    return TRUE;
-}
-
-LRESULT RenderWindow::handle_keydown(WPARAM wParam, LPARAM lParam){
-    this->key_presses.at((int)wParam) = true;
-    return TRUE;
-}
-
-inline LRESULT RenderWindow::draw_screen()
+LRESULT RenderWindow::draw_screen()
 {
-    //little xy axes
-    this->rframe.draw_line(zero, e[0] * 5, RED);
-    this->rframe.draw_line(zero, e[1] * 5, GREEN);
-    this->rframe.draw_line(zero, e[2] * 5, BLUE);
+    //set up screen with backround 
+    
+    this->rframe.process_meshes();
 
+    //for (int i = 0; i < point_field.size(); i++) {
+    //    screen.draw_circ(cam.proj(point_field[i]), 2, point_colors[i]);
+    //}
+
+    //little xy axes
+    this->rframe.draw_line(zero, e[0], RED);
+    this->rframe.draw_line(zero, e[1], GREEN);
+    this->rframe.draw_line(zero, e[2], BLUE);
 
     //crosshair
     this->screen.draw_line_raw(pt(CLIENT_WIDTH / 2 - 20, CLIENT_HEIGHT / 2), pt(CLIENT_WIDTH / 2 + 20, CLIENT_HEIGHT / 2), 0x33FFFF);
     this->screen.draw_line_raw(pt(CLIENT_WIDTH / 2, CLIENT_HEIGHT / 2 - 20), pt(CLIENT_WIDTH / 2, CLIENT_HEIGHT / 2 + 20), 0x33FFFF);
+
+    //alert 
+    if (show_alert) {
+        this->screen.draw_circ_raw(100, 100, 50, 0xFF0000);
+    }
 
     StretchDIBits(
         this->hdc,
@@ -269,10 +289,44 @@ inline LRESULT RenderWindow::draw_screen()
     return TRUE;
 }
 
+LRESULT RenderWindow::handle_mouse_move(WPARAM wParam, LPARAM lParam){
+    this->MOUSE_POS.x = GET_X_LPARAM(lParam);
+    this->MOUSE_POS.y = abs(GET_Y_LPARAM(lParam) - CLIENT_HEIGHT);
+    this->MOVMOUSE = true;
+    return TRUE;
+}
+
+LRESULT RenderWindow::handle_scroll(WPARAM wParam, LPARAM lParam){
+    int zDelta = GET_WHEEL_DELTA_WPARAM(wParam);
+    this->SCROLL_DIST += zDelta;
+    return TRUE;
+}
+
+LRESULT RenderWindow::handle_keydown(WPARAM wParam, LPARAM lParam){
+    this->key_presses.at((int)wParam) = true;
+
+    switch ((int)wParam) {
+         case 27:
+         {
+             this->SHOWMENU = ~this->SHOWMENU;
+         } 
+    }
+
+    return TRUE;
+}
+
+/*
+* This mostly handles the motion of the camera.  Eventually I will separate the 
+* motion from this.
+*/
 LRESULT RenderWindow::update_cam() {
-    
     //rotate camera with mouse
-    if (MOVMOUSE) {
+    if (SHOWMENU) {
+        HCURSOR c = LoadCursorA(NULL, (LPCSTR)IDC_ARROW);
+        SetCursor(c);
+        ShowCursor(true);
+    }
+    if (MOVMOUSE && !this->SHOWMENU) {
         ShowCursor(false);
         RECT win_rect;
         GetWindowRect(m_hwnd, &win_rect);
@@ -290,60 +344,164 @@ LRESULT RenderWindow::update_cam() {
         int dx = MOUSE_POS.x - CLIENT_CENTER.x;
         int dy = MOUSE_POS.y - CLIENT_CENTER.y;
 
-        double mag_rot = sqrt(dx*dx + dy*dy);
+        double mag_rot = sqrt(dx * dx + dy * dy);
+
+        vec normal = cam.get_normal();
+
+        double cam_limit = 0.1;
+
+        double cosine = R3::ip(normal, e[2])/R3::norm(normal);
 
         double horz = dx * 0.001;
         double vert = dy * 0.001;
 
-        cam.rotate(horz, vert);
+        if (cosine < -cos(cam_limit)) {
+            vec n = R3::unitize(proj_xy * normal) - e[2] * tan(PI / 2 - cam_limit);
+            cam.set_facing(n);
+        }
+        else if (cosine > cos(cam_limit)) {
+            vec n = R3::unitize(proj_xy * normal) + e[2] * tan(PI / 2 - cam_limit);
+            cam.set_facing(n);
+        }
+        else {
+            cam.rotate(horz, vert);
+        }
 
+       
+        /* This bit basically allows you to spin shapes in the direction of mouse movement
+        * cam_rotation is the matrix which spins the shapes.
+        *
         if (mag_rot > 1) {
-            this->v_horz = 5*horz; this->v_vert = 5*vert;   
+            this->v_horz = 5 * horz; this->v_vert = 5 * vert;
         }
         else {
             this->v_horz *= 0.95; this->v_vert *= 0.95;
         }
+        this->cam_rotation = cam.cam_rotation(v_horz * 0.2, v_vert * 0.2);
 
-        this->cam_rotation = cam.cam_rotation(v_horz*0.2, v_vert*0.2);
-       
+        PUT THESE IN window.h: 
+        double v_horz = 0;
+        double v_vert = 0; 
+        mat cam_rotation;
+        
+        */
+
         SetCursorPos(win_rect.left + CLIENT_CENTER.x + 8, win_rect.top + CLIENT_CENTER.y + 32);
         ClipCursor(&c_clip_old);
     }
 
     // camera movement with wasd + shift and space
-    vec cam_pos_new = cam.get_pos();
-    vec cam_normal = cam.get_normal();
-    vec cam_plane_horz = cam.get_plane()[0];
+    double speed = 0.4;
+    double cam_height = 10;
+    
+    vec vcam_relative = { 0,0,0 };
+    vec pos = cam.get_focal_point() -e[2] * cam_height;
+    vec new_pos = pos + vcam_real;
 
-    double speed = this->cam_speed;
+    //change of basis matrix from camera-relative coordinates to standard basis coordinates
+    mat CoB = mat(vector<mat>({ R3::unitize(proj_xy * cam.get_normal()), R3::unitize(proj_xy * cam.get_plane()[0]), {0,0,1} }));
 
-    if (key_presses[VK_SPACE]) {
-        cam_pos_new = cam_pos_new + e[2] * speed;
+    //colliding if new_pos is inside the cube
+    bool colliding = false;
+    auto handle_collision = [&](cube* C,vec P) {
+            colliding = true;
+
+            vec O = C->get_pos();
+            vec OP = P - O;
+
+            double l_xy = R3::norm(proj_xy * OP);
+            double l_xz = R3::norm(proj_xy * OP);
+            double l_yz = R3::norm(proj_yz * OP);   
+
+            double cosx = OP[0][0] / l_xy;
+            double cosy = OP[1][0] / l_xy;
+            bool in_x_quadrant = (cosx >= ROOT2 / 2) + (cosx <= -ROOT2 / 2);
+            bool in_y_quadrant = (cosy >= ROOT2 / 2) + (cosy <= -ROOT2 / 2);
+
+            double cosz = (OP[2][0] / l_xz) * in_x_quadrant + (OP[2][0] / l_yz) * in_y_quadrant;
+            bool is_vertical = (cosz >= ROOT2 / 2) + (cosz <= -ROOT2 / 2);
+
+            vec direction = {
+                (double)in_x_quadrant * !is_vertical,
+                (double)in_y_quadrant * !is_vertical,
+                (double)is_vertical
+            };
+
+            mat signs = {
+                {(double)sign(cosx),0,0},
+                {0,(double)sign(cosy),0},
+                {0,0,(double)sign(cosz)}
+            };
+            
+            vec plane_normal = signs * direction;
+            if (direction == vec({ 0, 0, 0 })) {
+                plane_normal = { 0,0,1 };
+            }
+            vec plane_pos = O + plane_normal * (C->get_side_length() / 2);
+
+            vcam_real = vcam_real - plane_normal * R3::ip(vcam_real, plane_normal)*1.4;
+            vec temp = new_pos - plane_pos;
+
+            this->rframe.draw_line(O, plane_pos,0x0000FF);
+
+            return plane_pos + temp - plane_normal * R3::ip(temp, plane_normal);
+        };
+    
+
+    //NEED TO FIX THIS AND MAKE COLLISION WORK PROPERLY FOR NON-POINT OBJECTS
+    //check collision for each cube.
+    for (cube* c : this->random_cubes) {        
+        if (c->is_inside(new_pos)) {
+            new_pos = handle_collision(c, new_pos);
+        }      
     }
-    if (key_presses[VK_SHIFT]) {
-        cam_pos_new = cam_pos_new - e[2] * speed;
-    }
+
+
+    //use wasd to control motion in xy-plane
     if (key_presses[0x57]) {
-        cam_pos_new = cam_pos_new + R3::unitize(proj_xy * cam_normal) * speed;
+        vcam_relative = vcam_relative + e[0] * speed;
     }
     if (key_presses[0x53]) {
-        cam_pos_new = cam_pos_new - R3::unitize(proj_xy * cam_normal) * speed;
+        vcam_relative = vcam_relative + e[0] * -speed;
     }
     if (key_presses[0x41]) {
-        cam_pos_new = cam_pos_new - R3::unitize(proj_xy * cam_plane_horz) * speed;
+        vcam_relative = vcam_relative + e[1] * -speed;
     }
     if (key_presses[0x44]) {
-        cam_pos_new = cam_pos_new + R3::unitize(proj_xy * cam_plane_horz) * speed;
+        vcam_relative = vcam_relative + e[1] * speed;
     }
-    cam.set_pos(cam_pos_new);
 
+    vcam_real = vcam_real + CoB * vcam_relative;
+    if (key_presses[VK_SPACE]) {
+        vcam_real = { vcam_real[0][0], vcam_real[1][0],1 };
+    }
+    //handle camera motion upon collision
+    if (colliding) { 
+        show_alert = true; 
+        vcam_real = mat({ {0.9,0,0}, {0,0.9,0}, {0,0,1} }) * vcam_real;
+
+        
+    }
+    else if (vcam_real[2][0] > -2) {
+        vcam_real = vcam_real - vec({ 0, 0, 0.01 });
+    }
+    
+    //resets camera position to origin if user falls too far
+    if (pos[2][0] < -100) {
+        cam.set_pos({0,0,40});
+        vcam_real = { 0,0,0 };
+    }
+    else {
+        cam.set_pos(new_pos + e[2] * cam_height);
+    }
+    
     return FALSE;
 }
 
 LRESULT RenderWindow::update_fields()
 {
     this->TIME_TICKER += 1;
-    this->FOV -= this->SCROLL_DIST / 20;
+    this->FOV -= this->SCROLL_DIST / 100;
 
     //handle FOV changes
     if (this->FOV > 0 && this->FOV < 180) {
@@ -353,6 +511,15 @@ LRESULT RenderWindow::update_fields()
     }
     else {
         this->FOV = 1*(FOV < 0) + 179*(FOV > 0);
+    }
+
+    if (TIME_TICKER % 120 == 0) {
+        show_alert = false;
+    }
+
+    this->SCROLL_DIST = 0;
+    for (int i = 0; i < 0xFE; i++) {
+        key_presses.at(i) = false;
     }
     return TRUE;
 }
