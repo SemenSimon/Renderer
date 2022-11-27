@@ -72,10 +72,13 @@
     <ClInclude Include="window.h">
       <Filter>Header Files\render_window</Filter>
     </ClInclude>
-    <ClInclude Include="wireframe.h">
+    <ClInclude Include="vertex_shader.h">
       <Filter>Header Files\render_window</Filter>
     </ClInclude>
-    <ClInclude Include="vertex_shader.h">
+    <ClInclude Include="wiremesh.h">
+      <Filter>Header Files\render_window</Filter>
+    </ClInclude>
+    <ClInclude Include="wiremesh.cpp">
       <Filter>Header Files\render_window</Filter>
     </ClInclude>
   </ItemGroup>

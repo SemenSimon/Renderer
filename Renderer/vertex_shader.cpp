@@ -1,4 +1,4 @@
-        #include "vertex_shader.h"
+#include "vertex_shader.h"
 #define PI 3.14159265358979323846  /* pi */
 
 
@@ -19,11 +19,17 @@ static u32 darken(u32 color,double factor) {
     return R|G|B;
 }
 
+/* for an adjacency matrix A, links i-th and j-th nodes by setting (i,j)-th and
+(j,i)-th entries to 1*/
+void link(int i, int j, matrix<int>* A) {
+    A->set(i, j, 1);
+    A->set(j, i, 1);
+}
+
 const mat proj_xy = {
             {1,0,0},
             {0,1,0},
             {0,0,0} };
-
 
 /* norm sqaured of a column vector v */
 double nsq(vec v) {
@@ -35,16 +41,16 @@ double nsq(vec v) {
 }
 
 int comp_edge(const void* E1, const void* E2) {
-    return ((render_frame::edge*)E2)->dist_sq - ((render_frame::edge*)E1)->dist_sq;
+    return ((vertex_shader::edge*)E2)->dist_sq - ((vertex_shader::edge*)E1)->dist_sq;
 }
 
 //WIREFRAME
-wiremesh::wiremesh(vertex& v) {
+wiremesh_old::wiremesh_old(vertex& v) {
     v.copy_to(this->mesh_begin,this->mesh_end);
     this->mesh_size = mesh_end - mesh_end;
 }
 
-void wiremesh::set_pos(vec new_pos) {
+void wiremesh_old::set_pos(vec new_pos) {
     vec pos_current = this->get_pos();
     vec pos_relative = new_pos - pos_current;
 
@@ -54,9 +60,9 @@ void wiremesh::set_pos(vec new_pos) {
         v++;
     }  
     this->pos = new_pos;
-}
+} 
 
-inline vec wiremesh::get_pos() {
+inline vec wiremesh_old::get_pos() {
     double size = (this->mesh_end-this->mesh_begin);
     vertex* v = this->mesh_begin;
     vec centroid = R3::zero();
@@ -68,7 +74,7 @@ inline vec wiremesh::get_pos() {
     return centroid * (static_cast<double>(1) / static_cast<double>(size));
 }
 
-inline wiremesh wiremesh::operator += (const vec& w) {
+inline wiremesh_old wiremesh_old::operator += (const vec& w) {
      for (vertex* v = this->mesh_begin; v != this->mesh_end; v++) {
         v->data = v->data + w;
     }
@@ -78,7 +84,7 @@ inline wiremesh wiremesh::operator += (const vec& w) {
 /*
 * Subtracts a vector from every point in the mesh
 */
-inline wiremesh wiremesh::operator -= (const vec& w) {
+inline wiremesh_old wiremesh_old::operator -= (const vec& w) {
     for (vertex* v = this->mesh_begin; v != this->mesh_end; v++) {
         v->data = v->data - w;  
     }
@@ -88,7 +94,7 @@ inline wiremesh wiremesh::operator -= (const vec& w) {
 /*
 * Transforms every point in the mesh with a matrix
 */
-wiremesh wiremesh::operator *= (mat T) {
+wiremesh_old wiremesh_old::operator *= (mat T) {
     vertex* v = this->mesh_begin;
     while ( v != this->mesh_end) {
         v->data = T * v->data;
@@ -98,12 +104,12 @@ wiremesh wiremesh::operator *= (mat T) {
 }
 
 //RENDER FRAME
-render_frame::render_frame(draw_device& ddev, camera& cam) { 
+vertex_shader::vertex_shader(draw_device& ddev, camera& cam) { 
 this->ddev = &ddev; 
 this->cam = &cam; 
 }
 
-render_frame::edge render_frame::process_edge(vec v1, vec v2, u32 color)
+vertex_shader::edge vertex_shader::process_edge(vec v1, vec v2, u32 color)
 {
     camera& cam = *(this->cam);
     draw_device& ddev = *(this->ddev);
@@ -130,17 +136,18 @@ render_frame::edge render_frame::process_edge(vec v1, vec v2, u32 color)
     return edge(v1, v2, nsq(proj_xy*((v1 + v2) * 0.5 - this->cam->get_focal_point())), color);
 }
 
-void render_frame::process_meshes()
+void vertex_shader::process_meshes()
 {
     double render_dist = 2000;
     unordered_map<wiremesh*, vector<edge>> edge_container;
 
-    /*this section adds each edge to a partition of edge_container for its
-    respective mesh*/
+    //this section adds each edge to a partition of edge_container for its
+    //respective mesh
     for (wiremesh* pmesh: this->meshes) {
         vector<edge> edges;
-        auto f = [&](vertex* n1, vertex* n2) {
-            edge E = process_edge(n1->data, n2->data,pmesh->color);
+
+        auto add_as_edge = [&](vec v1, vec v2) {
+            edge E = process_edge(v1, v2,pmesh->color);
 
             //1 dist_sq of -1 is reserved for when the edge is off-camera
             if (E.dist_sq != -1 /* && E.dist_sq < pow(render_dist, 2)*/) {
@@ -148,12 +155,22 @@ void render_frame::process_meshes()
             }
         };
      
-        pmesh->mesh_begin->execute_func(f);
+        //looks at connections in the adjacency matrix and adds connected vertices 
+        //as edges.
+        for (int i = 0; i < pmesh->size(); i++) {
+            vector<int> row = pmesh->adjacency_matrix[i];
+
+            for (int j = i; j < pmesh->size(); j++) {
+                if (row[j]) {
+                    add_as_edge(pmesh->points[i],pmesh->points[j]);
+                }
+            }
+        }
+
         edge_container.insert({ pmesh,edges });
     }
 
-    /*All edges in edge_container are then put into a single std::vector and sorted.
-    (I will add the sorting functionality later)*/
+    //All edges in edge_container are then put into a single std::vector and sorted.
     vector<edge> all_edges;
 
     for (wiremesh* pmesh : meshes) {
@@ -171,7 +188,7 @@ void render_frame::process_meshes()
     }
 }
 
-void render_frame::draw_line(vec v1, vec v2, u32 color)
+void vertex_shader::draw_line(vec v1, vec v2, u32 color)
 {
     edge E = process_edge(v1, v2);
     ddev->draw_line(cam->proj(E.v1), cam->proj(E.v2),color);
@@ -183,45 +200,30 @@ void obj_3d::set_pos(vec new_pos) {
     this->pos = new_pos;
 }
 
-void obj_3d::set_scale(double scale){
-    scale = abs(scale);
-    vertex* v = this->mesh.mesh_begin;
-    while (v != this->mesh.mesh_end) {
-        v->data = v->data * og_scale * scale;
-        v++;
-    }
-    og_scale = 1 / scale;
-    
-}
-
 void obj_3d::transform(mat T){
     vec pos = this->get_pos();
-    for (vertex* v = this->mesh.mesh_begin; v < this->mesh.mesh_end; v++) {
-        vec temp = v->data - pos;
-        v->data = pos + T*temp;
+    for (vec& v : this->mesh.points) {
+        vec temp = v - pos;
+        v = pos + T * temp;
     }
 }
 
 
 //SURFACE
 surface::surface(int size, realnum spacing) {
-    mesh_grid_gen(this->mesh.mesh_begin, size, spacing);
-    this->mesh.mesh_end = this->mesh.mesh_begin + static_cast<int>(pow(size,2));
-    this->pos = (this->mesh.mesh_begin + size * size / 2)->data;
-    this->size = size;
-}
-
-void surface::mesh_grid_gen(vertex*& start, int size, realnum spacing) {
     //don't look at this madness
     const vec zero = mat::zero(3, 1);
     const vec e[3] = { mat::std_basis(3,0) , mat::std_basis(3,1), mat::std_basis(3,2) };
 
-    start = new vertex[pow(size + 1, 2)];
+    int npoints = pow(size, 2);
+
+    vector<vec> points(npoints);
+    matrix<int> adjacency = matrix<int>::zero(npoints, npoints);
 
     for (int i = 0; i < size; i++) {
         for (int j = 0; j < size; j++) {
-            vertex& O = start[i * size + j];
-            O.data = zero + e[0] * spacing * i + e[1] * spacing * j;
+            vec O = zero + e[0] * spacing * i + e[1] * spacing * j;
+            points[i * size + j] = O;
 
             for (int k = 0; k < 4; k++) {
                 int sgn = pow(-1, k / 2);
@@ -229,20 +231,22 @@ void surface::mesh_grid_gen(vertex*& start, int size, realnum spacing) {
                 int new_x = i + dx; int new_y = j + dy;
 
                 if ((new_x >= 0 && new_x < size && new_y >= 0 && new_y < size)) {
-                    vertex& P = start[new_x * size + new_y];
-                    O.add_node(P);
+                    vec P = points[new_x * size + new_y];
+                    link(i * size + j, new_x * size + new_y, &adjacency);
                 }
             }
         }
     }
-};
+    this->mesh = wiremesh(points, adjacency);
+    this->pos = mesh.get_pos();
+}
 
 //CUBE
 cube::cube(realnum side_length, vec pos){
     vec zero = vec::zero(3, 1);
     vec e[3] = { mat::std_basis(3,0) , mat::std_basis(3,1), mat::std_basis(3,2) };
 
-    matrix<int> adj = matrix<int>({
+    matrix<int> adjacency = matrix<int>({
         {0,1,1,1,0,0,0,0},
         {1,0,0,0,1,0,1,0},
         {1,0,0,0,1,1,0,0},
@@ -253,29 +257,20 @@ cube::cube(realnum side_length, vec pos){
         {0,0,0,0,1,1,1,0}
     }).t();
 
-    int V = adj.get_rows();
-    this->mesh.mesh_begin = new vertex[V];
-    this->mesh.mesh_end = this->mesh.mesh_begin + V;
-    
-    for (int i = 0; i < V; i++) {
-        vertex* v = this->mesh.mesh_begin + i;
-        for (int j = i; j < V; j++) {
-            if (adj[i][j]) {
-                v->add_node(*(this->mesh.mesh_begin + j));
-            }
-        }
-    }
-    this->mesh.mesh_begin->data = zero;
-    for (int i = 0; i < V-1; i++) {
-        (this->mesh.mesh_begin + i + 1)->data =
+    int npoints = adjacency.get_rows();
+    vector<vec> points(npoints);
+
+    points[0] = zero;
+    for (int i = 0; i < npoints -1; i++) {
+        points[i + 1] =
             e[(i) % 3] * side_length + 
             e[(i+1) % 3] * (i >= 3) * side_length +
-            e[(i + 2) % 3] * (i >= 6) * side_length
-        ;
+            e[(i + 2) % 3] * (i >= 6) * side_length;
     }
 
+    this->mesh = wiremesh(points, adjacency);
     this->mesh.set_pos(pos);
-    this->pos = pos;
+    this->pos = mesh.get_pos();
     this->side_length = side_length;
 }
 
@@ -292,6 +287,8 @@ sphere::sphere(realnum r, int res, vec pos) {
     this->r = r;
     this->pos = pos;
 
+    vector<vec> points;
+
     int size = res * 4; // amount of points per halfcircle
 
     realnum theta = PI / (2 * res);
@@ -305,79 +302,45 @@ sphere::sphere(realnum r, int res, vec pos) {
         }
     }
     points.push_back(axis*R3::rotate_intr(0,PI,0) + pos);
+    int npoints = points.size();
 
-    int mesh_size = points.size();
-    this->mesh.mesh_begin = new vertex[mesh_size];
-    this->mesh.mesh_end = this->mesh.mesh_begin + mesh_size;
+    //this matrix tells us which vertices are connected
+    matrix<int> adjacency = matrix<int>::zero(npoints,npoints);
 
-    for (int i = 0; i < mesh_size; i++) {
-        mesh[i]->data = points[i];
-    }
-    
     for (int i = 0; i < res * 4; i++) {
         for (int j = 0; j < res * 2; j++) {
             if (j == 0) {
-                mesh[0]->add_node(*mesh[1 + i*(res*2 - 1) + j]);
+                link(0,1 + i*(res*2 - 1) + j, &adjacency);
             }
             else if (j == res * 2 - 1) {
-               mesh[-1]->add_node(*mesh[i * (res * 2 - 1) + j]);
+                link(-1,i * (res * 2 - 1) + j, &adjacency);
             }
             else {
-                mesh[i * (res * 2 - 1) + j]->add_node(*mesh[i * (res * 2 - 1) + j + 1]);
+                link(i * (res * 2 - 1) + j,i * (res * 2 - 1) + j + 1, &adjacency);
                 
             }
 
-            bool in_range = ((i + 1) * (res * 2 - 1) + j < mesh_size - 1) && abs(i) + abs(j) != 0;
+            bool in_range = ((i + 1) * (res * 2 - 1) + j < npoints - 1) && abs(i) + abs(j) != 0;
             if (in_range) {
-                mesh[i * (res * 2 - 1) + j]->add_node(*mesh[(i + 1) * (res * 2 - 1) + j]);
+                link(i * (res * 2 - 1) + j,(i + 1) * (res * 2 - 1) + j, &adjacency);
             }
             else {
-                mesh[i * (res * 2 - 1) + j]->add_node(*mesh[j]);
+                link(i * (res * 2 - 1) + j,j, &adjacency);
             }
         }
     }
-    this->pos = this->mesh.get_pos();
+    
+    this->mesh = wiremesh(points, adjacency);
+    this->mesh.set_pos(pos);
+    this->pos = mesh.get_pos();
 
 }
 
 void sphere::draw_points(draw_device ddev, camera cam)
 {
-    for (vec p : this->points) {
+    for (vec p : this->mesh.points) {
         ddev.draw_circ(cam.proj(p),3.4,0x00FFFF);
     }
     return;
 }
 
-flatplane::flatplane(int size, int num_lines)
-{
-    this->mesh.mesh_begin = new vertex[4*num_lines];
-    this->mesh.mesh_end = this->mesh.mesh_begin + num_lines*4-1;
-
-    vec x = { 1,0,0 }; vec y = { 0,1,0 };
-
-    double spacing = size / (double)num_lines;
-    
-    int i = 0;
-    for (int j = -num_lines/2; j < num_lines/2; j++) {
-        mesh[i]->data  = x * size + y * spacing * j;
-        mesh[i+1]->data = x * -size + y * spacing * j;
-        mesh[i]->add_node(*mesh[i + 1]);
-
-        mesh[i+2]->data = y * size + x * spacing * j;
-        mesh[i + 3]->data = y * -size + x * spacing * j;
-        mesh[i+2]->add_node(*mesh[i + 3]);
-
-        if (i < size - 1) {
-            mesh[i]->add_node(*mesh[i + 4]);
-            mesh[i+2]->add_node(*mesh[i + 6]);
-        }    
-
-        i += 4;
-    }
-
-    mesh[0]->add_node(*mesh[2]);
-
-    this->pos = this->mesh.get_pos();
-    this->mesh.set_pos(pos);
-    this->size = size;
-}

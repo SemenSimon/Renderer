@@ -114,7 +114,7 @@ public:
 
     //screen
     draw_device screen;
-    render_frame rframe;
+    vertex_shader rframe;
     bool show_alert;
     
     //camera 

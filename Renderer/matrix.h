@@ -9,7 +9,7 @@
 using namespace std;
 
 /*
-* Immutable class representing an (mxn)-matrix.
+* Class representing an (mxn)-matrix.
 */
 template<typename F = double> class matrix
 {
@@ -52,7 +52,7 @@ public:
 	std::vector<std::vector<F>> get_arr() { return arr; }
 
 	//shit
-	//matrix aug(matrix& B, int* side = RIGHT);
+	void set(int i, int j, F val) { this->arr[i][j] = val; }
 	matrix comp(int i, int j = 0);
 	matrix row(int i);
 	matrix col(int i);

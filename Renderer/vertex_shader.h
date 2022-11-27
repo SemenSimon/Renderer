@@ -2,6 +2,7 @@
 #include "draw_device.h"
 #include "linked_node.h"
 #include "camera.h"
+#include "wiremesh.h"
 #include <unordered_map>
 
 using vertex = linked_node<vec>;
@@ -16,16 +17,16 @@ using vertex = linked_node<vec>;
 * cpu cores or something, by drawing the connections for one row.  Or I could even just
 * have a vector full of pairs for the connections.
 */
-class wiremesh{
+class wiremesh_old{
 public:
-    wiremesh() { }
-    wiremesh(int size) {
+    wiremesh_old() { }
+    wiremesh_old(int size) {
         this->mesh_begin = new vertex[size];
         this->mesh_end = mesh_begin + size;
         this->mesh_size = size;
     }
-    wiremesh(vertex& v);
-    wiremesh(vertex& begin, vertex& end) {
+    wiremesh_old(vertex& v);
+    wiremesh_old(vertex& begin, vertex& end) {
         this->mesh_begin = &begin;
         this->mesh_end = &end;
         this->mesh_size = mesh_end - mesh_begin;
@@ -35,9 +36,9 @@ public:
     void set_pos(vec new_pos);
 
     //operator overloads
-    wiremesh operator += (const vec& v);
-    wiremesh operator -= (const vec& v);
-    wiremesh operator *= (mat T);
+    wiremesh_old operator += (const vec& v);
+    wiremesh_old operator -= (const vec& v);
+    wiremesh_old operator *= (mat T);
 
     vertex* operator [] (int i) {
         this->mesh_size = mesh_end - mesh_begin;
@@ -69,12 +70,12 @@ private:
     vec pos;
 };
 
-class render_frame {
+class vertex_shader {
 
 public:
     //constructors
-    render_frame() {}
-    render_frame(draw_device& ddev, camera& cam);
+    vertex_shader() {}
+    vertex_shader(draw_device& ddev, camera& cam);
 
     //custom data types
     struct edge {
@@ -100,7 +101,6 @@ public:
     void add_mesh(wiremesh* mesh) { this->meshes.push_back(mesh); }
     void draw_line(vec v1, vec v2, u32 color = 0xFFFFFF);
 
-
 private:
     
     vector<wiremesh*> meshes; 
@@ -113,27 +113,23 @@ class obj_3d {
 
 protected: 
     vec pos;
-    double og_scale = 1;
 public:
     //constructors
     obj_3d(){}
     
     //member functions
-    inline vertex* get_mesh_begin() { return this->mesh.mesh_begin; }
-    inline vertex* get_mesh_end() { return this->mesh.mesh_end; }
-    inline wiremesh* get_mesh() { return &(this->mesh); }
     inline vec get_pos() {return mesh.get_pos(); }
     void set_pos(vec new_pos);
     void set_scale(double scale);
     void transform(mat T);
     template<typename func>
     void transform(func F);
+
     //fields
     wiremesh mesh;
-    void set_color(u32 color) { this->mesh.color = color; }
-
 };
 
+//grid
 class surface : public obj_3d {
 public:
     surface(){}
@@ -147,14 +143,7 @@ private:
     void mesh_grid_gen(vertex*& start, int size, realnum spacing = 1);
 };
 
-class flatplane : public obj_3d {
-public:
-    flatplane(){}
-    flatplane(int size,int num_lines);
-private:
-    int size;
-};
-
+//cube 
 class cube : public obj_3d {
 public:
     cube(){}
@@ -166,46 +155,14 @@ private:
     realnum side_length;
 };
 
+//sphere
 class sphere : public obj_3d {
 public:
     sphere(realnum r, int res, vec pos = { 0,0,0 });
-  
-    template<typename func>
-    void proj_sphere(func& f, wiremesh* proj_plane);
     void draw_points(draw_device ddev,camera cam);
 private:
-    vector<vec> points;
     realnum r;
 };
-
-template<typename func>
-void sphere::proj_sphere(func& f,wiremesh* proj_plane)
-{
-    *proj_plane = wiremesh(this->mesh);
-
-    for (int i = 0; i < points.size(); i++) {
-        vec v = points[i];
-        realnum x = v[0][0];
-        realnum y = v[1][0];
-        realnum z = v[2][0];
-
-        vec hair = v * (1 / this->r);
-
-        vec v_R2 = { x,y };
-        realnum r_o = R3::norm(v_R2);
-
-        realnum r_stereo_proj = R3::stereographic_proj_R2(r_o, z);
-
-        realnum x_p = r_stereo_proj * x / r_o;
-        realnum y_p = r_stereo_proj * y / r_o;
-
-        vec stereo_proj = vec({ x_p,y_p,0 });
-        
-        (this->mesh.mesh_begin + i)->data = v + (hair * abs(f(x_p / 5.0, y_p / 5.0)));
-
-        (*proj_plane)[i]->data = stereo_proj;
-    }
-}
 
 template<typename func>
 inline void surface::eval(func f, realnum scale) {
@@ -214,8 +171,8 @@ inline void surface::eval(func f, realnum scale) {
             realnum x = (i - size / 2) * scale;
             realnum y = (j - size / 2) * scale;
 
-            vertex* point = this->mesh.mesh_begin + i * size + j;
-            point->data = { point->data[0][0],point->data[1][0], f(x,y) };
+            vec* point = &(this->mesh.points[i * size + j]);
+            *point = { point[0][0],point[1][0], f(x,y) };
         }
     }
 }
@@ -223,9 +180,9 @@ inline void surface::eval(func f, realnum scale) {
 template<typename func>
 void obj_3d::transform(func F) {
     vec pos = this->get_pos();
-    for (vertex* v = this->mesh.mesh_begin; v < this->mesh.mesh_end; v++) {
-        vec temp = v->data - pos;
-        v->data = pos + F(temp);
+    for (vec* pv : this->mesh.points) {
+        vec temp = *pv - pos;
+        *pv = pos + F(temp);
     }
 }
 

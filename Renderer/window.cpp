@@ -63,7 +63,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     win.objects.push_back(&cube1);
 
     for (obj_3d* ob : win.objects) {
-        win.rframe.add_mesh(ob->get_mesh());
+        win.rframe.add_mesh(&(ob->mesh));
     }
      
     /**************** main run loop *****************/
@@ -81,10 +81,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
             DispatchMessage(&msg);
         }
 
-        for (cube* C : win.random_cubes) {
-            vec cube_pos = C->get_pos();
-            C->set_pos(vec({ cube_pos[0][0],cube_pos[1][0],-100*cos(win.time() - pow(cube_pos[0][0] / 70,2) - pow(cube_pos[1][0] / 70,2))}));
-        }
         //update shit
         win.update_cam();
         win.update_fields();
@@ -170,23 +166,23 @@ LRESULT RenderWindow::handle_create() {
 
     this->screen = draw_device(pixel_mem, CLIENT_WIDTH, CLIENT_HEIGHT,100);
     this->cam = camera({ 1,1,-1 }, { -10,-10,30 });
-    this->rframe = render_frame(this->screen, this->cam);
+    this->rframe = vertex_shader(this->screen, this->cam);
 
     this->framerate = 120;
     this->FOV = 90;
 
     //a bunch of shapes because it's cool
     {
-        vector<int> bounds = {3, 3, 1};
+        vector<int> bounds = {2, 2, 1};
         int cube_size = 30;
-
+    
         for (int i = -bounds[0]; i < bounds[0]; i++) {
             for (int j = -bounds[1]; j < bounds[1]; j++) {
                 for (int k = 0; k < bounds[2]; k++) {
                    vec pos = vec({ (double)i, (double)j, (double)k }) * cube_size;
                    double yes = (double)(rand() % 100) / 100;
-
-                   if (yes > 0) {
+    
+                   if (yes > 100) {
                        cube* C = new cube(cube_size,pos);
                        random_cubes.push_back(C);
                        this->objects.push_back(C);
@@ -404,8 +400,6 @@ LRESULT RenderWindow::update_cam() {
     //colliding if new_pos is inside the cube
     bool colliding = false;
     auto handle_collision = [&](cube* C,vec P) {
-            colliding = true;
-
             vec O = C->get_pos();
             vec OP = P - O;
 
@@ -439,7 +433,7 @@ LRESULT RenderWindow::update_cam() {
             }
             vec plane_pos = O + plane_normal * (C->get_side_length() / 2);
 
-            vcam_real = vcam_real - plane_normal * R3::ip(vcam_real, plane_normal)*1.4;
+            vcam_real = vcam_real - plane_normal * R3::ip(vcam_real, plane_normal)*1.7;
             vec temp = new_pos - plane_pos;
 
             this->rframe.draw_line(O, plane_pos,0x0000FF);
@@ -453,9 +447,9 @@ LRESULT RenderWindow::update_cam() {
     for (cube* c : this->random_cubes) {        
         if (c->is_inside(new_pos)) {
             new_pos = handle_collision(c, new_pos);
+            colliding = true;
         }      
     }
-
 
     //use wasd to control motion in xy-plane
     if (key_presses[0x57]) {
@@ -479,8 +473,6 @@ LRESULT RenderWindow::update_cam() {
     if (colliding) { 
         show_alert = true; 
         vcam_real = mat({ {0.9,0,0}, {0,0.9,0}, {0,0,1} }) * vcam_real;
-
-        
     }
     else if (vcam_real[2][0] > -2) {
         vcam_real = vcam_real - vec({ 0, 0, 0.01 });
