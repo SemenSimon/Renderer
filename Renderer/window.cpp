@@ -55,13 +55,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     ShowWindow(hwnd, nCmdShow);
     GetClipCursor(&win.c_clip_old);
 
-
-    //a few things
-    cube cube1(30, { 0,0,0});
-
-    win.random_cubes.push_back(&cube1);    
-    win.objects.push_back(&cube1);
-
     for (obj_3d* ob : win.objects) {
         win.rframe.add_mesh(&(ob->mesh));
     }
@@ -83,8 +76,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
         //update shit
         win.update_cam();
-        win.update_fields();
         win.draw_screen();
+        win.update_fields();
+        
     }
     
     return 0;
@@ -173,7 +167,7 @@ LRESULT RenderWindow::handle_create() {
 
     //a bunch of shapes because it's cool
     {
-        vector<int> bounds = {2, 2, 1};
+        vector<int> bounds = {1,1, 1};
         int cube_size = 30;
     
         for (int i = -bounds[0]; i < bounds[0]; i++) {
@@ -182,7 +176,7 @@ LRESULT RenderWindow::handle_create() {
                    vec pos = vec({ (double)i, (double)j, (double)k }) * cube_size;
                    double yes = (double)(rand() % 100) / 100;
     
-                   if (yes > 100) {
+                   if (yes > 0.0) {
                        cube* C = new cube(cube_size,pos);
                        random_cubes.push_back(C);
                        this->objects.push_back(C);
@@ -260,6 +254,19 @@ LRESULT RenderWindow::draw_screen()
     //crosshair
     this->screen.draw_line_raw(pt(CLIENT_WIDTH / 2 - 20, CLIENT_HEIGHT / 2), pt(CLIENT_WIDTH / 2 + 20, CLIENT_HEIGHT / 2), 0x33FFFF);
     this->screen.draw_line_raw(pt(CLIENT_WIDTH / 2, CLIENT_HEIGHT / 2 - 20), pt(CLIENT_WIDTH / 2, CLIENT_HEIGHT / 2 + 20), 0x33FFFF);
+
+    matrix<int> adjacency = {
+        {0,1,1,0},
+        {1,0,0,1},
+        {1,0,0,1},
+        {0,1,1,0}
+    };
+    pt pts[4] = { pt(100+10*sin(time()),150),pt(150,150-10 * sin(time())),
+                  pt(100- 10 * sin(time()),50),pt(150,50+ 10 * sin(time())) };
+    this->screen.draw_quadrilateral_raw(adjacency,pts);
+    for (int i = 0; i < 4; i++) {
+        this->screen.draw_circ_raw(pts[i].x, pts[i].y, 5, 0xFF0000);
+    }
 
     //alert 
     if (show_alert) {
@@ -392,7 +399,7 @@ LRESULT RenderWindow::update_cam() {
     
     vec vcam_relative = { 0,0,0 };
     vec pos = cam.get_focal_point() -e[2] * cam_height;
-    vec new_pos = pos + vcam_real;
+    vec new_pos = { 0,0,0 };// pos + vcam_real;
 
     //change of basis matrix from camera-relative coordinates to standard basis coordinates
     mat CoB = mat(vector<mat>({ R3::unitize(proj_xy * cam.get_normal()), R3::unitize(proj_xy * cam.get_plane()[0]), {0,0,1} }));

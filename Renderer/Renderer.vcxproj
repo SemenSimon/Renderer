@@ -144,8 +144,6 @@
     <ClInclude Include="window.h" />
     <ClInclude Include="subspace.h" />
     <ClInclude Include="vector_space.h" />
-    <ClInclude Include="wiremesh.h" />
-    <ClInclude Include="wiremesh.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="camera.cpp" />

@@ -1,11 +1,19 @@
 #include "draw_device.h"
 #include <math.h>
+#include <unordered_map>
 
 using namespace linalg;
 
+/*
+* parameterization of line between two points in R2
+*/
 struct line {
 
-    line() {}
+    line() {
+        //this is useful for telling us if the line was created by the default constructor.
+        this->sgn = 0;
+    }
+
     line(pt O, pt P) {
         int dx = P.x - O.x; int dy = P.y - O.y;
         bool is_horz = (dy == 0);
@@ -35,15 +43,42 @@ struct line {
         this->P = P;
     }
 
-    inline pt eval(double dist) {
-        int x = sgn * dist;
+    inline pt eval(double t) {
+        int x = sgn * t;
         int y = (int)( (x_slope*!reflected + y_slope*reflected) * x);
 
         return pt(!reflected * (x + O.x) + (reflected) * (y + O.x),
                   !reflected * (y + O.y) + (reflected) * (x + O.y));
     }
 
+    inline pt eval_by_x(double t) {
+        int x = t;
+        int y = (int)(x_slope * x);
+
+        return pt((x + O.x),(y + O.y) );
+    }
+
+    inline pt eval_by_y(double t) {
+        int y = t;
+        int x = (int)(y_slope * y);
+
+        return pt((x + O.x),(y + O.y));
+    }
+
+    inline bool operator == (const line& other) {
+        return ((this->O == other.P && this->P == other.O)  ||
+                (this->O == other.O && this->P == other.P)) &&
+               (this->sgn == -other.sgn);
+    }
     
+    line flip() {
+        this->sgn *= -1;
+        pt temp1 = this->O;
+        pt temp2 = this->P;
+        this->O = temp2;
+        this->P = temp1;
+        return *this;
+    }
 
     pt O, P;
     double x_slope;
@@ -53,6 +88,27 @@ struct line {
     bool reflected;
 };
 
+int comp_pts_by_y(const void* a, const void* b) {
+    pt arg1 = *(const pt*)a;
+    pt arg2 = *(const pt*)b;
+
+    return (arg1.y > arg2.y) - (arg1.y < arg2.y);
+}
+
+
+struct pt_hash {
+    std::size_t operator () (const pt& P) const {
+        auto x = static_cast<unsigned long long> (P.x*10000);
+        auto y = static_cast<unsigned long long> (P.y*10000);
+        return std::hash<size_t>()(x) ^ std::hash<size_t>()(y);
+    }
+};
+
+struct pt_eq {
+    bool operator () (const pt& A, const pt& B) const {
+       return A.x == B.x && A.y == B.y;
+    }
+};
 
 //DRAW DEVICE
 
@@ -111,7 +167,6 @@ void draw_device::draw_circ(matrix<realnum> O, realnum r, u32 color) {
 
 inline void draw_device::draw_line_raw(pt O, pt P, u32 color)
 {
-
     line L(O, P);
 
     int len = min(L.len, DISPLAY_WIDTH)*!L.reflected + min(L.len,DISPLAY_HEIGHT)*L.reflected;
@@ -168,6 +223,79 @@ void draw_device::draw_triangle_raw(pt A, pt B, pt C, u32 color)
 
         draw_line_raw(P1, P2, color);
         
+    }
+}
+
+void draw_device::draw_quadrilateral_raw(matrix<int> adjacency, pt* pts, u32 color) {
+    pt pts_sorted_by_y[4];
+
+    for (int i = 0; i < 4; i++) {
+        pts_sorted_by_y[i] = *(pts + i);
+    }
+    qsort(pts_sorted_by_y, 4, sizeof(pt), comp_pts_by_y);
+    
+    std::unordered_map<pt, line*, pt_hash,pt_eq> lines_for_pts;
+
+    //allocates memory for two lines corresponding to each point.
+    for (int i = 0; i < 4; i++) {
+        line* lines_i = new line[2];
+        lines_for_pts.insert({ pts_sorted_by_y[i], lines_i });
+    }
+
+    for (int i = 0; i < 4; i++) {
+        for (int j = i; j < 4; j++) {
+            //this means the points are connected.
+            if (adjacency[i][j]) {
+                line* lines_i = lines_for_pts.at(pts[i]);                
+                line* lines_j = lines_for_pts.at(pts[j]);
+
+                //sgn is zero for lines made by the default constructor. This lets
+                //us fill both spots in lines_i and lines_j.
+                *(lines_i + (lines_i[0].sgn != 0)) = line(pts[i], pts[j]);
+                *(lines_j + (lines_j[0].sgn != 0)) = line(pts[j], pts[i]);
+                int a = 1;
+            }
+        }
+    }
+
+    line* lines = lines_for_pts.at(pts_sorted_by_y[0]);
+    int y_next = pts_sorted_by_y[1].y;
+    int i = 0;
+
+    line L1 = lines[0];
+    line L2 = lines[1];
+
+    int h_max = pts_sorted_by_y[3].y - pts_sorted_by_y[0].y;
+
+    for (int h = pts_sorted_by_y[0].y; h <= pts_sorted_by_y[3].y; h++) {
+        pt P1 = L1.eval_by_y(h-L1.O.y);
+        pt P2 = L2.eval_by_y(h-L2.O.y);
+
+        int x_i = min(P1.x, P2.x);
+        int x_f = max(P1.x, P2.x);
+
+        for (int k = x_i; k < x_f; k++) {
+            draw_pixel(k, h);
+        }
+
+        if (h >= y_next && i < 2) {
+            i++;
+            lines = lines_for_pts.at(pts_sorted_by_y[i]);
+            y_next = pts_sorted_by_y[i+1].y;
+
+            for (bool j = 0; j <= 1; j++) {
+                line other = lines[(int)!j];
+
+                if (L1 == lines[j]) {
+                    L1 = other;
+                    break;
+                }
+                if (L2 == lines[j]) {
+                    L2 = other;
+                    break;
+                }
+            }         
+        }
     }
 }
 

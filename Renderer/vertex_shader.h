@@ -2,8 +2,62 @@
 #include "draw_device.h"
 #include "linked_node.h"
 #include "camera.h"
-#include "wiremesh.h"
 #include <unordered_map>
+
+struct edge {
+    edge() {}
+    edge(vec v1, vec v2, double dist_sq = 0, u32 color = 0xFFFFFF) {
+        this->v1 = v1;
+        this->v2 = v2;
+        this->color = color;
+        this->dist_sq = dist_sq;
+    }
+
+    vec v1;
+    vec v2;
+    u32 color;
+    double dist_sq;
+};
+
+struct face {
+    face() {}
+    face(std::initializer_list<vec> vertices, double dist_sq, u32 color = 0xFFFFFF) {
+        int i = 0;
+        for (vec p : vertices) {
+           this->vertices[i] = p;
+            i++;
+        }
+        this->color = color;
+        this->dist_sq = dist_sq;
+    }
+
+    u32 color;
+    double dist_sq;
+    vec vertices[4];
+};
+
+class wiremesh {
+public:
+    wiremesh() {}
+    wiremesh(vector<vec> vertices, matrix<int> adjacency_matrix);
+
+    wiremesh operator += (const vec& v);
+    wiremesh operator -= (const vec& v);
+    wiremesh operator *= (mat T);
+
+    vec get_pos() { return this->pos; }
+    void set_pos(vec v) { *this += v - this->pos; }
+    int size() { return this->vertices.size(); };
+
+    matrix<int> adjacency_matrix;
+    vector<vec> vertices;
+    vector<edge> edges;
+    vector<face> faces;
+
+    u32 color = 0xFFFFFF;
+private:
+    vec pos;
+};
 
 class vertex_shader {
 
@@ -13,20 +67,7 @@ public:
     vertex_shader(draw_device& ddev, camera& cam);
 
     //custom data types
-    struct edge {
-        edge() {}
-        edge(vec v1, vec v2, double dist_sq = 0, u32 color = 0xFFFFFF) {
-            this->v1 = v1; 
-            this->v2 = v2; 
-            this->color = color;
-            this->dist_sq = dist_sq;
-        }
-
-        vec v1;
-        vec v2;
-        u32 color;
-        double dist_sq;
-    };
+   
 
     /* ---------- RENDERING PIPELINE OPERATIONS ----------- */
     edge process_edge(vec v1, vec v2, u32 color = 0xFFFFFF);
@@ -94,7 +135,7 @@ private:
 class sphere : public obj_3d {
 public:
     sphere(realnum r, int res, vec pos = { 0,0,0 });
-    void draw_points(draw_device ddev,camera cam);
+    void draw_vertices(draw_device ddev,camera cam);
 private:
     realnum r;
 };
@@ -106,7 +147,7 @@ inline void surface::eval(func f, realnum scale) {
             realnum x = (i - size / 2) * scale;
             realnum y = (j - size / 2) * scale;
 
-            vec* point = &(this->mesh.points[i * size + j]);
+            vec* point = &(this->mesh.vertices[i * size + j]);
             *point = { point[0][0],point[1][0], f(x,y) };
         }
     }
@@ -115,7 +156,7 @@ inline void surface::eval(func f, realnum scale) {
 template<typename func>
 void obj_3d::transform(func F) {
     vec pos = this->get_pos();
-    for (vec* pv : this->mesh.points) {
+    for (vec* pv : this->mesh.vertices) {
         vec temp = *pv - pos;
         *pv = pos + F(temp);
     }

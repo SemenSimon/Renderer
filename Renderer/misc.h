@@ -6,10 +6,15 @@
 struct pt {
     pt() { x = 0; y = 0; }
     pt(int a, int b) { x = a; y = b; }
+
     template<typename K>
     pt(matrix<K> mat) {
         x = static_cast<int>(mat[0][0]);
         y = static_cast<int>(mat[1][0]);
+    }
+
+    bool operator == (const pt& other) {
+        return (this->x == other.x) && (this->y == other.y);
     }
 
     pt operator + (const pt pt2) {

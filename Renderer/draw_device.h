@@ -65,6 +65,12 @@ public:
         u32 color = 0xFFFFFF
     );
 
+    void draw_quadrilateral_raw(
+        matrix<int> adjacency,
+        pt* pts,
+        u32 color = 0xFFFFFF
+    );
+
     void draw_line_raw_dotted(
         pt O,
         pt P,
