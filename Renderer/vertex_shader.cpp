@@ -42,66 +42,7 @@ double nsq(vec v) {
 
 int comp_edge(const void* E1, const void* E2) {
     return ((vertex_shader::edge*)E2)->dist_sq - ((vertex_shader::edge*)E1)->dist_sq;
-}
-
-//WIREFRAME
-wiremesh_old::wiremesh_old(vertex& v) {
-    v.copy_to(this->mesh_begin,this->mesh_end);
-    this->mesh_size = mesh_end - mesh_end;
-}
-
-void wiremesh_old::set_pos(vec new_pos) {
-    vec pos_current = this->get_pos();
-    vec pos_relative = new_pos - pos_current;
-
-    vertex* v = this->mesh_begin;
-    while (v != this->mesh_end) {
-        v->data = v->data + pos_relative;
-        v++;
-    }  
-    this->pos = new_pos;
-} 
-
-inline vec wiremesh_old::get_pos() {
-    double size = (this->mesh_end-this->mesh_begin);
-    vertex* v = this->mesh_begin;
-    vec centroid = R3::zero();
-
-    while (v != this->mesh_end) {
-        centroid = centroid + v->data;
-        v++;
-    }
-    return centroid * (static_cast<double>(1) / static_cast<double>(size));
-}
-
-inline wiremesh_old wiremesh_old::operator += (const vec& w) {
-     for (vertex* v = this->mesh_begin; v != this->mesh_end; v++) {
-        v->data = v->data + w;
-    }
-    return *this;
-}
-
-/*
-* Subtracts a vector from every point in the mesh
-*/
-inline wiremesh_old wiremesh_old::operator -= (const vec& w) {
-    for (vertex* v = this->mesh_begin; v != this->mesh_end; v++) {
-        v->data = v->data - w;  
-    }
-    return *this;
-}
-
-/*
-* Transforms every point in the mesh with a matrix
-*/
-wiremesh_old wiremesh_old::operator *= (mat T) {
-    vertex* v = this->mesh_begin;
-    while ( v != this->mesh_end) {
-        v->data = T * v->data;
-        v++;
-    }
-    return *this;
-}
+}5
 
 //RENDER FRAME
 vertex_shader::vertex_shader(draw_device& ddev, camera& cam) { 
@@ -207,7 +148,6 @@ void obj_3d::transform(mat T){
         v = pos + T * temp;
     }
 }
-
 
 //SURFACE
 surface::surface(int size, realnum spacing) {
