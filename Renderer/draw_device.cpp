@@ -226,24 +226,38 @@ void draw_device::draw_triangle_raw(pt A, pt B, pt C, u32 color)
     }
 }
 
-void draw_device::draw_quadrilateral_raw(matrix<int> adjacency, pt* pts, u32 color) {
-    pt pts_sorted_by_y[4];
+void draw_device::draw_quadrilateral(matrix<int> adjacency, vector<matrix<realnum>> vertices, u32 color) {
+    int npts = vertices.size();
+    pt* pts = new pt[npts];
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < npts; i++) {
+        pts[i] = DISPLAY_CENTER + pt(vertices[i] * scale);
+        if (pts[i] == DISPLAY_CENTER) {
+            return;
+        }
+    }
+
+    draw_quadrilateral_raw(adjacency, npts, pts, color);
+}
+
+void draw_device::draw_quadrilateral_raw(matrix<int> adjacency, int npts, pt* pts, u32 color) {
+    pt* pts_sorted_by_y = new pt[npts];
+
+    for (int i = 0; i < npts; i++) {
         pts_sorted_by_y[i] = *(pts + i);
     }
-    qsort(pts_sorted_by_y, 4, sizeof(pt), comp_pts_by_y);
+    qsort(pts_sorted_by_y, npts, sizeof(pt), comp_pts_by_y);
     
     std::unordered_map<pt, line*, pt_hash,pt_eq> lines_for_pts;
 
     //allocates memory for two lines corresponding to each point.
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < npts; i++) {
         line* lines_i = new line[2];
         lines_for_pts.insert({ pts_sorted_by_y[i], lines_i });
     }
 
-    for (int i = 0; i < 4; i++) {
-        for (int j = i; j < 4; j++) {
+    for (int i = 0; i < npts; i++) {
+        for (int j = i; j < npts; j++) {
             //this means the points are connected.
             if (adjacency[i][j]) {
                 line* lines_i = lines_for_pts.at(pts[i]);                
@@ -265,7 +279,7 @@ void draw_device::draw_quadrilateral_raw(matrix<int> adjacency, pt* pts, u32 col
     line L1 = lines[0];
     line L2 = lines[1];
 
-    int h_max = pts_sorted_by_y[3].y - pts_sorted_by_y[0].y;
+    int h_max = pts_sorted_by_y[npts-1].y - pts_sorted_by_y[0].y;
 
     for (int h = pts_sorted_by_y[0].y; h <= pts_sorted_by_y[3].y; h++) {
         pt P1 = L1.eval_by_y(h-L1.O.y);
@@ -275,7 +289,7 @@ void draw_device::draw_quadrilateral_raw(matrix<int> adjacency, pt* pts, u32 col
         int x_f = max(P1.x, P2.x);
 
         for (int k = x_i; k < x_f; k++) {
-            draw_pixel(k, h);
+            draw_pixel(k, h,color);
         }
 
         if (h >= y_next && i < 2) {
@@ -283,8 +297,8 @@ void draw_device::draw_quadrilateral_raw(matrix<int> adjacency, pt* pts, u32 col
             lines = lines_for_pts.at(pts_sorted_by_y[i]);
             y_next = pts_sorted_by_y[i+1].y;
 
-            for (bool j = 0; j <= 1; j++) {
-                line other = lines[(int)!j];
+            for (int j = 0; j <= 1; j++) {
+                line other = lines[(j==0)];
 
                 if (L1 == lines[j]) {
                     L1 = other;

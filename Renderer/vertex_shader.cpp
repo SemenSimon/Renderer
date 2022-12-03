@@ -1,10 +1,8 @@
 #include "vertex_shader.h"
 #define PI 3.14159265358979323846  /* pi */
 
-const mat proj_xy = {
-            {1,0,0},
-            {0,1,0},
-            {0,0,0} };
+using bigint = long long int;
+
 
 static u32 darken(u32 color,double factor) {
     u32 R = 0, G = 0, B = 0;
@@ -30,17 +28,12 @@ void link(int i, int j, matrix<int>* A) {
     A->set(j, i, 1);
 }
 
-/* norm sqaured of a column vector v */
-double nsq(vec v) {
-    double x = 0;
-    for (int i = 0; i < v.get_rows(); i++) {
-        x += pow(v[i][0], 2);
-    }
-    return x;
+int comp_edge(const void* E1, const void* E2) {
+    return ((edge*)E2)->dist_squared - ((edge*)E1)->dist_squared;
 }
 
-int comp_edge(const void* E1, const void* E2) {
-    return ((edge*)E2)->dist_sq - ((edge*)E1)->dist_sq;
+int comp_face(const void* F1, const void* F2) {
+    return (*(face**)F2)->dist_squared - (*(face**)F1)->dist_squared;
 }
 
 static vec centroid(vector<vec> vertices) {
@@ -52,11 +45,110 @@ static vec centroid(vector<vec> vertices) {
     return temp * pow((double)vertices.size(), -1);
 }
 
+
+
+bigint factorial(int x) {
+    bigint val = x;
+    while (x > 1) {
+        x--;
+        val *= x;
+    }
+    return val;
+}
+
+bigint nCk(int n, int k) {
+    bigint val = 1;
+    for (int i = 1; i <= k; i++) {
+        val *= (n - k + i);
+    }
+    return val / factorial(k);
+}
+
+int** generate_all_combinations(int n, int k) {
+
+    bigint m_height = nCk(n, k);
+    int** combos = new int* [m_height];
+    int* nums = new int[k];
+
+    for (int i = 0; i < m_height; i++) combos[i] = new int[k];
+    for (int i = 0; i < k; i++) nums[i] = i + 1;
+    for (int i = 0; i < k; i++)  combos[0][i] = nums[i] - 1;
+
+    bigint combo_num = 1;
+
+    while (nums[0] <= n - k) {
+
+        nums[k - 1]++;
+
+        for (int i = 0; i < k; i++) {
+            if (nums[k - i - 1] > n) {
+
+                int prev = nums[k - i - 2];
+
+                for (int j = -1; j <= i; j++) {
+                    nums[k - i - 1 + j] = prev + j + 2;
+                }
+            }
+        }
+
+        if (nums[k - 1] <= n) {
+            for (int i = 0; i < k; i++)  combos[combo_num][i] = nums[i] - 1;
+            combo_num++;
+        }
+    }
+
+    return combos;
+}
+
+face_internal::face_internal(const face_internal& other) {
+    this->adjacency = other.adjacency;
+    this->num_vertices = other.num_vertices;
+    this->vertex_indices = new int[num_vertices];
+
+    for (int i = 0; i < num_vertices; i++) {
+        vertex_indices[i] = other.vertex_indices[i];
+    }
+}
+
 //MESH
 wiremesh::wiremesh(vector<vec> vertices, matrix<int> adjacency_matrix) {
+
     this->vertices = vertices;
     this->adjacency_matrix = adjacency_matrix;
     this->pos = centroid(vertices);
+
+    for (int i = 0; i < this->size(); i++) {
+        vector<int> row = adjacency_matrix[i];
+        //find edges
+        for (int j = i; j < this->size(); j++) {
+            if (row[j]) {
+                this->edges.push_back({ i,j });
+            }
+        }
+    }
+
+    //find faces
+    int vertices_per_face = 4;
+    int ncombos = nCk(this->size(),vertices_per_face);
+    int** vertex_combos = generate_all_combinations(this->size(), vertices_per_face);
+
+    for (int i = 0; i < ncombos; i++) {
+        //partition of adjacency matrix corresponding to a particular combination of vertices
+        matrix<int> adjacency = this->adjacency_matrix.select(vertex_combos[i], vertices_per_face);
+
+        //vector full of ones
+        vector<int> ones(vertices_per_face); for (int& x : ones) x = 1;
+        matrix<int> connections_per_vertex = adjacency * ones;
+
+        for (int k = 0; k < vertices_per_face; k++) {
+            if (connections_per_vertex[k][0] != 2) {
+                break;
+            }
+            if (k == vertices_per_face - 1) {
+                this->faces.push_back(face_internal(vertex_combos[i], vertices_per_face, adjacency));
+            }
+        }
+    }
 }
 
 inline wiremesh wiremesh::operator +=(const vec& v) {
@@ -91,13 +183,11 @@ this->ddev = &ddev;
 this->cam = &cam; 
 }
 
-edge vertex_shader::process_edge(vec v1, vec v2, u32 color){
-    camera& cam = *(this->cam);
-    draw_device& ddev = *(this->ddev);
+edge vertex_shader::process_edge(vec v1, vec v2, double dist_squared, u32 color){
 
-    vec normal = cam.get_normal();
-    vec clip_point = cam.get_focal_point() + normal;
-    realnum foc_dist = cam.get_foc_dist();
+    vec normal = this->cam->get_normal();
+    vec clip_point = this->cam->get_focal_point() + normal;
+    realnum foc_dist = this->cam->get_foc_dist();
 
     bool v1_behind = R3::ip(v1 - clip_point, normal) <= 0;
     bool v2_behind = R3::ip(v2 - clip_point, normal) <= 0;
@@ -114,64 +204,122 @@ edge vertex_shader::process_edge(vec v1, vec v2, u32 color){
         v2 = R3::line_plane_intersect(v2, v2 - v1, clip_point, normal);
     }
 
-    return edge(v1, v2, nsq(proj_xy*((v1 + v2) * 0.5 - this->cam->get_focal_point())), color);
+    return edge(v1, v2, dist_squared, color);
 }
 
 void vertex_shader::process_meshes()
 {
     double render_dist = 2000;
-    unordered_map<wiremesh*, vector<edge>> edge_container;
+    vec focal_point = this->cam->get_focal_point();
 
-    //this section adds each edge to a partition of edge_container for its
+    unordered_map<wiremesh*, vector<edge>> mesh_edge_map;
+    unordered_map<wiremesh*, vector<face>> mesh_face_map;
+
+    //this adds each edge to a partition of edge_container for its
     //respective mesh
     for (wiremesh* pmesh: this->meshes) {
+        auto all_projected_vertices = pmesh->vertices;
+        for (vec& v : all_projected_vertices) {
+            v = cam->proj(v);
+        }
+
         vector<edge> edges;
+        vector<face> faces;
 
-        auto add_as_edge = [&](vec v1, vec v2) {
-            edge E = process_edge(v1, v2,pmesh->color);
+        for (auto vertex_pair : pmesh->edges) {
 
-            //1 dist_sq of -1 is reserved for when the edge is off-camera
-            if (E.dist_sq != -1 /* && E.dist_sq < pow(render_dist, 2)*/) {
-                edges.push_back(E); 
-            }
-        };
-     
-        //looks at connections in the adjacency matrix and adds connected vertices 
-        //as edges.
-        for (int i = 0; i < pmesh->size(); i++) {
-            vector<int> row = pmesh->adjacency_matrix[i];
+            vec& v1 = pmesh->vertices[vertex_pair.first];
+            vec& v2 = pmesh->vertices[vertex_pair.second];
 
-            for (int j = i; j < pmesh->size(); j++) {
-                if (row[j]) {
-                    add_as_edge(pmesh->vertices[i],pmesh->vertices[j]);
-                }
+            //the midpoint of v1 and v2 relative to the camera is projected onto 
+            // the xy-plane to get cylindrical distance.
+            vec midpoint = proj_xy * ((v1 + v2) * 0.5 - focal_point);
+            double dist_squared = R3::ip(midpoint, midpoint);
+
+            //dist_squared of -1 is reserved for when the edge is off-camera. We 
+            // only render edges which are in view
+            if (dist_squared != -1){
+                edges.push_back(process_edge(v1, v2, dist_squared, pmesh->color));
             }
         }
 
-        edge_container.insert({ pmesh,edges });
+        vec n = cam->get_normal();
+
+        for (face_internal facedata : pmesh->faces) {
+            int npoints = facedata.num_vertices;
+
+            //gather vertices for face
+            vector<vec> projected_vertices(npoints);
+            vector<vec> vertices(npoints);
+
+            for (int i = 0; i < npoints; i++) {
+                projected_vertices[i] = all_projected_vertices[facedata.vertex_indices[i]];
+                vertices[i] = pmesh->vertices[facedata.vertex_indices[i]];
+            }
+
+            vec midpoint = centroid(vertices) - focal_point;
+            double dist_squared = R3::ip(midpoint, midpoint);
+
+            //handle shading
+            vec v1 = vertices[1] - vertices[0];
+            vec v2 = vertices[2] - vertices[0];
+
+            vec surface_normal = R3::cross_prod(v1,v2);
+            double brightness = 0;
+
+            for (light* L : this->lights) {
+                double dist;
+                vec light_ray = L->process_ray(midpoint+focal_point, & dist);
+
+                brightness +=( R3::ip(surface_normal, light_ray)*L->strength )/ (R3::norm(surface_normal)*pow(dist,2));
+            }
+
+            u32 color = darken(pmesh->color, abs(brightness));
+
+            if (dist_squared != -1) {
+                faces.push_back(face(projected_vertices,facedata.adjacency,dist_squared,color));
+            }
+        }
+       
+        mesh_face_map.insert({ pmesh,faces });
+        mesh_edge_map.insert({ pmesh,edges });
     }
 
     //All edges in edge_container are then put into a single std::vector and sorted.
-    vector<edge> all_edges;
-
+    int num_faces_total = 0;
     for (wiremesh* pmesh : meshes) {
-        for (edge E : edge_container.at(pmesh)) {
-            double x = exp(-(pow(E.dist_sq/pow(render_dist*0.6,2),3) ));
-            E.color = darken(E.color,x);
-            all_edges.push_back(E);
+        num_faces_total += mesh_face_map.at(pmesh).size();
+    }
+    vector<face*> all_faces(num_faces_total); {
+        int i = 0;
+        for (wiremesh* pmesh : meshes) {
+            for (face& F : mesh_face_map.at(pmesh)) {
+                all_faces[i] = &F;
+                i++;
+            }
         }
     }
 
-    qsort(all_edges.data(),all_edges.size(),sizeof(edge), comp_edge);
+    // we sort the edges by the square of their distance from the camera and then 
+    // draw them in that order.
+    qsort(all_faces.data(),all_faces.size(),sizeof(face*), comp_face);
 
-    for (edge E : all_edges) {
-        ddev->draw_line(cam->proj(E.v1), cam->proj(E.v2), E.color);
+    for (face* F : all_faces) {
+        //vector<vec> projected_vertices(E.nvertices);
+        //
+        //for (int i = 0; i < E.nvertices; i++) {
+        //    projected_vertices[i] = cam->proj(E.vertices[i]);
+        //}
+        //
+        ddev->draw_quadrilateral(F->adjacency, F->vertices, F->color);
+
+        //ddev->draw_line(cam->proj(E.vertices[0]), cam->proj(E.vertices[2]), E.color);
     }
 }
 
 void vertex_shader::draw_line(vec v1, vec v2, u32 color)
 {
-    edge E = process_edge(v1, v2);
+    edge E = process_edge(v1, v2,1);
     ddev->draw_line(cam->proj(E.v1), cam->proj(E.v2),color);
 }
 
@@ -186,6 +334,13 @@ void obj_3d::transform(mat T){
     for (vec& v : this->mesh.vertices) {
         vec temp = v - pos;
         v = pos + T * temp;
+    }
+}
+
+void obj_3d::affine_transform(mat T) {
+    vec pos = this->get_pos();
+    for (vec& v : this->mesh.vertices) {
+        v = T * v;
     }
 }
 
@@ -217,6 +372,7 @@ surface::surface(int size, realnum spacing) {
             }
         }
     }
+    this->size = size;
     this->mesh = wiremesh(vertices, adjacency);
     this->pos = mesh.get_pos();
 }
@@ -281,7 +437,8 @@ sphere::sphere(realnum r, int res, vec pos) {
             vertices.push_back(point);
         }
     }
-    vertices.push_back(axis*R3::rotate_intr(0,PI,0) + pos);
+    vec top = R3::rotate_intr(0, PI, 0) * axis  + pos;
+    vertices.push_back(top);
     int nvertices = vertices.size();
 
     //this matrix tells us which vertices are connected
@@ -289,18 +446,19 @@ sphere::sphere(realnum r, int res, vec pos) {
 
     for (int i = 0; i < res * 4; i++) {
         for (int j = 0; j < res * 2; j++) {
+
             if (j == 0) {
                 link(0,1 + i*(res*2 - 1) + j, &adjacency);
             }
             else if (j == res * 2 - 1) {
-                link(-1,i * (res * 2 - 1) + j, &adjacency);
+                link(nvertices-1,i * (res * 2 - 1) + j, &adjacency);
             }
             else {
-                link(i * (res * 2 - 1) + j,i * (res * 2 - 1) + j + 1, &adjacency);
-                
+                link(i * (res * 2 - 1) + j,i * (res * 2 - 1) + j + 1, &adjacency);          
             }
 
             bool in_range = ((i + 1) * (res * 2 - 1) + j < nvertices - 1) && abs(i) + abs(j) != 0;
+
             if (in_range) {
                 link(i * (res * 2 - 1) + j,(i + 1) * (res * 2 - 1) + j, &adjacency);
             }

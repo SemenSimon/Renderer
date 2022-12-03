@@ -55,6 +55,13 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     ShowWindow(hwnd, nCmdShow);
     GetClipCursor(&win.c_clip_old);
 
+    //surface s1(9,20);
+    //s1.set_pos({ 0,0,0 });
+    //win.rframe.add_mesh(&s1.mesh);
+
+    //sphere sph1(20, 4);
+    //win.rframe.add_mesh(&sph1.mesh);
+
     for (obj_3d* ob : win.objects) {
         win.rframe.add_mesh(&(ob->mesh));
     }
@@ -74,6 +81,18 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
             DispatchMessage(&msg);
         }
 
+        auto f = [&](double x, double y) {
+            return 15*exp(-pow(x+sin(win.time()), 2) - pow(y-cos(win.time()), 2));
+        };
+
+        for (cube* C : win.random_cubes) {
+            C->affine_transform(R3::rotate_intr(PI / 128, 0, 0));
+        }
+
+        //sph1.affine_transform(R3::rotate_intr(PI / 128, 0, 0));
+
+        win.LIGHT.pos = { 100*cos(3*win.time()),100*sin(3*win.time()), 200};
+        
         //update shit
         win.update_cam();
         win.draw_screen();
@@ -159,15 +178,18 @@ LRESULT RenderWindow::handle_create() {
     this->pixel_mem = (u32*)memory;
 
     this->screen = draw_device(pixel_mem, CLIENT_WIDTH, CLIENT_HEIGHT,100);
-    this->cam = camera({ 1,1,-1 }, { -10,-10,30 });
+    this->cam = camera({ 0.5,0.5,-1 }, { -300,-300,50 });
     this->rframe = vertex_shader(this->screen, this->cam);
 
     this->framerate = 120;
     this->FOV = 90;
 
+    this->LIGHT = light({ 0, 0, 100 }, 20000);
+    this->rframe.add_light(&LIGHT);
+
     //a bunch of shapes because it's cool
     {
-        vector<int> bounds = {1,1, 1};
+        vector<int> bounds = {5,5, 1};
         int cube_size = 30;
     
         for (int i = -bounds[0]; i < bounds[0]; i++) {
@@ -176,7 +198,7 @@ LRESULT RenderWindow::handle_create() {
                    vec pos = vec({ (double)i, (double)j, (double)k }) * cube_size;
                    double yes = (double)(rand() % 100) / 100;
     
-                   if (yes > 0.0) {
+                   if (yes > 0.5) {
                        cube* C = new cube(cube_size,pos);
                        random_cubes.push_back(C);
                        this->objects.push_back(C);
@@ -254,19 +276,6 @@ LRESULT RenderWindow::draw_screen()
     //crosshair
     this->screen.draw_line_raw(pt(CLIENT_WIDTH / 2 - 20, CLIENT_HEIGHT / 2), pt(CLIENT_WIDTH / 2 + 20, CLIENT_HEIGHT / 2), 0x33FFFF);
     this->screen.draw_line_raw(pt(CLIENT_WIDTH / 2, CLIENT_HEIGHT / 2 - 20), pt(CLIENT_WIDTH / 2, CLIENT_HEIGHT / 2 + 20), 0x33FFFF);
-
-    matrix<int> adjacency = {
-        {0,1,1,0},
-        {1,0,0,1},
-        {1,0,0,1},
-        {0,1,1,0}
-    };
-    pt pts[4] = { pt(100+10*sin(time()),150),pt(150,150-10 * sin(time())),
-                  pt(100- 10 * sin(time()),50),pt(150,50+ 10 * sin(time())) };
-    this->screen.draw_quadrilateral_raw(adjacency,pts);
-    for (int i = 0; i < 4; i++) {
-        this->screen.draw_circ_raw(pts[i].x, pts[i].y, 5, 0xFF0000);
-    }
 
     //alert 
     if (show_alert) {
@@ -396,10 +405,11 @@ LRESULT RenderWindow::update_cam() {
     // camera movement with wasd + shift and space
     double speed = 0.4;
     double cam_height = 10;
-    
+
     vec vcam_relative = { 0,0,0 };
     vec pos = cam.get_focal_point() -e[2] * cam_height;
-    vec new_pos = { 0,0,0 };// pos + vcam_real;
+    vec new_pos = pos + vcam_real;
+    vcam_real = { vcam_real[0][0], vcam_real[1][0],0 };
 
     //change of basis matrix from camera-relative coordinates to standard basis coordinates
     mat CoB = mat(vector<mat>({ R3::unitize(proj_xy * cam.get_normal()), R3::unitize(proj_xy * cam.get_plane()[0]), {0,0,1} }));
@@ -449,6 +459,7 @@ LRESULT RenderWindow::update_cam() {
         };
     
 
+
     //NEED TO FIX THIS AND MAKE COLLISION WORK PROPERLY FOR NON-POINT OBJECTS
     //check collision for each cube.
     for (cube* c : this->random_cubes) {        
@@ -482,8 +493,9 @@ LRESULT RenderWindow::update_cam() {
         vcam_real = mat({ {0.9,0,0}, {0,0.9,0}, {0,0,1} }) * vcam_real;
     }
     else if (vcam_real[2][0] > -2) {
-        vcam_real = vcam_real - vec({ 0, 0, 0.01 });
+        //vcam_real = vcam_real - vec({ 0, 0, 0.01 });
     }
+    vcam_real = mat({ {0.9,0,0}, {0,0.9,0}, {0,0,1} }) * vcam_real;
     
     //resets camera position to origin if user falls too far
     if (pos[2][0] < -100) {
@@ -493,6 +505,8 @@ LRESULT RenderWindow::update_cam() {
     else {
         cam.set_pos(new_pos + e[2] * cam_height);
     }
+
+    
     
     return FALSE;
 }

@@ -44,6 +44,7 @@ matrix<F>::matrix(const matrix<F>& A) {
 	arr = A.arr;
 	rows = A.rows;
 	cols = A.cols;
+	debug_setup();
 }
 
 /*
@@ -65,6 +66,7 @@ matrix<F>::matrix(const std::initializer_list<F>& v)
 		this->arr[i] = vector<F>({ x });
 		i++;
 	}
+	debug_setup();
 }
 
 /*
@@ -81,6 +83,7 @@ matrix<F>::matrix(const vector<F>& v)
 	this->arr = vector<vector<F>>(n);
 
 	for (int i = 0; i < n; i ++) { this->arr[i] = vector<F>({v[i]}); }
+	debug_setup();
 }
 
 /*
@@ -92,6 +95,7 @@ matrix<F>::matrix(const vector<vector<F>>& x) {
 	rows = x.size();
 	cols = x[0].size();
 	arr = x;
+	debug_setup();
 }
 
 /*
@@ -106,6 +110,7 @@ matrix<F>::matrix(const std::initializer_list<matrix>& col_list)
 	arr = matrix(arr).t().arr;
 	cols = arr[0].size();
 	rows = arr.size();
+	debug_setup();
 }
 
 /*
@@ -120,6 +125,7 @@ matrix<F>::matrix(std::vector<matrix> col_list)
 	arr = matrix(arr).t().arr;
 	cols = arr[0].size();
 	rows = arr.size();
+	debug_setup();
 }
 
 //OPERATORS
@@ -130,9 +136,6 @@ inline matrix<F> matrix<F>::operator += (matrix const& other) const
 	return sum;
 }
 
-/*
-* Overrides addition operator.
-*/
 template<typename F>
 inline matrix<F> matrix<F>::operator + (matrix const& other) const {
 	std::vector<vector<F>> temp = arr;
@@ -145,9 +148,6 @@ inline matrix<F> matrix<F>::operator + (matrix const& other) const {
 	return matrix(temp);
 }
 
-/*
-* Overrides subtraction operator.
-*/
 template<typename F> 
 inline matrix<F> matrix<F>::operator - (matrix const& other) const{
 	vector<vector<F>> temp = arr;
@@ -162,7 +162,7 @@ inline matrix<F> matrix<F>::operator - (matrix const& other) const{
 }
 
 /*
-* Overrides multiplication operator for scalars.
+* Multiplication operator for scalars.
 */
 template<typename F> 
 inline matrix<F> matrix<F>::operator * (F const& c) const {
@@ -178,7 +178,7 @@ inline matrix<F> matrix<F>::operator * (F const& c) const {
 }
 
 /*
-* Overrides multiplication operator for matrices.
+* Multiplication operator for matrices.
 */
 template<typename F> 
 inline matrix<F> matrix<F>::operator * (matrix const& other) const {
@@ -197,9 +197,6 @@ inline matrix<F> matrix<F>::operator * (matrix const& other) const {
 	return matrix(temp);
 }
 
-/* 
-* Override equality operator
-*/
 template<typename F> 
 bool matrix<F>::operator == (matrix const& other) {
 	if (arr == other.arr) {
@@ -433,5 +430,16 @@ matrix<F> matrix<F>::submatrix(int m, int n) {
 	return matrix(temp);
 }
 
+template<typename F>
+matrix<F> matrix<F>::select(int* indices, int num_indices) {
+	matrix<F> mat_new = matrix::zero(num_indices, num_indices);
+
+	for (int i = 0; i < num_indices; i++) {
+		for (int j = 0; j < num_indices; j++) {
+			mat_new.set(i, j,(*this)[indices[i]][indices[j]]);
+		}
+	}
+	return mat_new;
+}
 
 #endif

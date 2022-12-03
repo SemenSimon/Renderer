@@ -127,6 +127,8 @@ public:
     vector<obj_3d*> objects;
     vector<cube*> random_cubes;
 
+    light LIGHT;
+
     //other fields
     int CLIENT_WIDTH, CLIENT_HEIGHT;
     pt CLIENT_CENTER;

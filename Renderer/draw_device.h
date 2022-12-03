@@ -65,8 +65,15 @@ public:
         u32 color = 0xFFFFFF
     );
 
+    void draw_quadrilateral(
+        matrix<int> adjacency,
+        vector<matrix<realnum>> vertices,
+        u32 color = 0xFFFFFF
+    );
+
     void draw_quadrilateral_raw(
         matrix<int> adjacency,
+        int npts,
         pt* pts,
         u32 color = 0xFFFFFF
     );

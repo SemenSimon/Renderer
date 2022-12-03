@@ -3,37 +3,71 @@
 #include "linked_node.h"
 #include "camera.h"
 #include <unordered_map>
+#include <tuple>
+
+
+const mat proj_xy = {
+            {1,0,0},
+            {0,1,0},
+            {0,0,0} };
+
 
 struct edge {
     edge() {}
-    edge(vec v1, vec v2, double dist_sq = 0, u32 color = 0xFFFFFF) {
+
+    edge(vec v1, vec v2, double dist_squared = 0, u32 color = 0xFFFFFF) {
         this->v1 = v1;
         this->v2 = v2;
         this->color = color;
-        this->dist_sq = dist_sq;
+        this->dist_squared = dist_squared;
     }
 
     vec v1;
     vec v2;
     u32 color;
-    double dist_sq;
+    double dist_squared;
 };
 
 struct face {
     face() {}
-    face(std::initializer_list<vec> vertices, double dist_sq, u32 color = 0xFFFFFF) {
-        int i = 0;
+
+    face(vector<vec> vertices, matrix<int> adjacency, double dist_squared, u32 color = 0xFFFFFF) {
         for (vec p : vertices) {
-           this->vertices[i] = p;
-            i++;
+           this->vertices.push_back(p);
         }
+        this->nvertices = vertices.size();
+
         this->color = color;
-        this->dist_sq = dist_sq;
+        this->dist_squared = dist_squared;
+        this->adjacency = adjacency;
     }
 
     u32 color;
-    double dist_sq;
-    vec vertices[4];
+    double dist_squared;
+    matrix<int> adjacency;
+    vector<vec> vertices;
+    int nvertices;
+};
+
+/*Face comprised of n vertices, to be used for reference inside a mesh object.*/
+struct face_internal {
+    face_internal() {}
+    face_internal(const face_internal& other);
+
+    face_internal(int* vertex_indices,int num_vertices, matrix<int> adjacency) {
+        this->vertex_indices = new int[num_vertices];
+
+        for (int i = 0; i < num_vertices; i++) {
+            this->vertex_indices[i] = vertex_indices[i];
+        }
+
+        this->num_vertices = num_vertices;
+        this->adjacency = adjacency;
+    }
+
+    matrix<int> adjacency;
+    int* vertex_indices;
+    int num_vertices;
 };
 
 class wiremesh {
@@ -51,12 +85,35 @@ public:
 
     matrix<int> adjacency_matrix;
     vector<vec> vertices;
-    vector<edge> edges;
-    vector<face> faces;
+    vector< std::pair<int,int> > edges;
+    vector<face_internal> faces;
 
-    u32 color = 0xFFFFFF;
+    u32 color = 0xAA10FF;
 private:
     vec pos;
+};
+
+class light {
+public:
+    light() {}
+    light(vec pos, double strength) {
+        this->pos = pos;
+        this->strength = strength;
+    }
+
+    /*return light ray from source to an arbitrary point
+    * @param contact_point [in]
+    * @param dist [out] gives distance from light source to contact point
+    */
+    vec process_ray(vec contact_point, double* dist) {
+        vec ray = contact_point - pos;
+        *dist = R3::norm(ray);
+        return ray * (1 / (*dist));
+    }
+
+    vec pos;
+    double strength;
+
 };
 
 class vertex_shader {
@@ -66,24 +123,27 @@ public:
     vertex_shader() {}
     vertex_shader(draw_device& ddev, camera& cam);
 
-    //custom data types
-   
 
     /* ---------- RENDERING PIPELINE OPERATIONS ----------- */
-    edge process_edge(vec v1, vec v2, u32 color = 0xFFFFFF);
+    edge process_edge(vec v1, vec v2, double dist_squared, u32 color = 0xFFFFFF);
     void process_meshes();
 
     /* ---------- OTHER ---------- */
     void add_mesh(wiremesh* mesh) { this->meshes.push_back(mesh); }
+    void add_light(light* source) { this->lights.push_back(source); }
     void draw_line(vec v1, vec v2, u32 color = 0xFFFFFF);
 
 private:
     
     vector<wiremesh*> meshes; 
+    vector<light*> lights;
+
     draw_device* ddev;
     camera* cam;
 
 };
+
+
 
 class obj_3d {
 
@@ -98,6 +158,7 @@ public:
     void set_pos(vec new_pos);
     void set_scale(double scale);
     void transform(mat T);
+    void affine_transform(mat T);
     template<typename func>
     void transform(func F);
 
@@ -116,7 +177,6 @@ public:
 private:
     int size;
     realnum spacing;
-    void mesh_grid_gen(vertex*& start, int size, realnum spacing = 1);
 };
 
 //cube 
@@ -146,9 +206,9 @@ inline void surface::eval(func f, realnum scale) {
         for (int j = 0; j < size; j++) {
             realnum x = (i - size / 2) * scale;
             realnum y = (j - size / 2) * scale;
+            vec point = this->mesh.vertices[i * size + j];
 
-            vec* point = &(this->mesh.vertices[i * size + j]);
-            *point = { point[0][0],point[1][0], f(x,y) };
+            this->mesh.vertices[i * size + j] = {point[0][0],point[1][0],f(x,y)};
         }
     }
 }
@@ -156,9 +216,9 @@ inline void surface::eval(func f, realnum scale) {
 template<typename func>
 void obj_3d::transform(func F) {
     vec pos = this->get_pos();
-    for (vec* pv : this->mesh.vertices) {
-        vec temp = *pv - pos;
-        *pv = pos + F(temp);
+    for (vec& v : this->mesh.vertices) {
+        vec temp = v - pos;
+        v = pos + F(temp);
     }
 }
 

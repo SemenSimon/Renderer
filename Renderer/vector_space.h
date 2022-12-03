@@ -25,9 +25,10 @@ private:
 * @tparam product - function from underlying vector space to F
 */
 template<typename F,typename vec,typename product>
-class ip_space : public vector_space<F,vec> {
+class inner_product_space : public vector_space<F,vec> {
 
 public:
+	//inner product
 	static inline F ip(vec v, vec w, typename product::ex_input* ex_arg = nullptr) { 
 		product op;
 		return op(v, w);
@@ -46,7 +47,7 @@ public:
 * @tparam product - dot product by default, or get creative if you want.
 */
 template<typename F,int dim, typename product = inner_products::std_coord<F, dim>>
-class coord_space : public ip_space<F, matrix<F>, product> {
+class coord_space : public inner_product_space<F, matrix<F>, product> {
 public:
 	static const int dim = dim;
 	static matrix<F> zero() {
@@ -56,10 +57,13 @@ public:
 
 class R3 : public coord_space<realnum, 3, inner_products::std_coord<realnum, 3>> {
 public:
+	//inner product
 	static inline realnum ip(elem v, elem w) {
-		return (v.t() * w)[0][0];//v[0][0] * w[0][0] +			 
-			   //v[1][0] * w[1][0] + 
-			   //v[2][0] * w[2][0];
+		realnum val = 0;
+		for (int i = 0; i < 3; i++) {
+			val += v[i][0] * w[i][0];
+		}
+		return val;
 	}
 
 	static inline realnum norm(elem v) { return sqrt(ip(v, v)); }

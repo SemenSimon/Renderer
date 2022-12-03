@@ -3,8 +3,10 @@
 #define MATRIX_H
 
 #include <vector>
+#include <math.h>
 #include <string>
 #include <complex>
+#include <initializer_list>
 
 using namespace std;
 
@@ -17,6 +19,7 @@ protected:
 	int rows;
 	int cols;
 	std::vector<std::vector<F>> arr;
+	F bigness = 0;
 
 public:
 	//constructors
@@ -61,6 +64,15 @@ public:
 	matrix row_swap(int r1, int r2);
 	matrix t();
 	matrix submatrix(int m, int n);
+	matrix select(int* indices, int num_indices);
+
+	void debug_setup() {
+		for (int i = 0; i < rows; i++) {
+			for (int j = 0; j < cols; j++) {
+				this->bigness += pow(arr[i][j], 2);
+			}
+		}
+	}
 	
 };
 
