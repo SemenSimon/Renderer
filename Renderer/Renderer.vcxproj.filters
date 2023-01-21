@@ -54,7 +54,7 @@
     <ClInclude Include="subspace.h">
       <Filter>Header Files\linalg</Filter>
     </ClInclude>
-    <ClInclude Include="vector_space.h">
+    <ClInclude Include="misc_algebra.h">
       <Filter>Header Files\linalg</Filter>
     </ClInclude>
     <ClInclude Include="camera.h">

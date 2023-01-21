@@ -1,7 +1,7 @@
 #pragma once
 #include "matrix.h"
 #include "matrixutils.h"
-#include "vector_space.h"
+#include "misc_algebra.h"
 #include <vector>
 #include <initializer_list>
 
