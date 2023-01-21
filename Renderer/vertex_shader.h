@@ -31,22 +31,43 @@ struct edge {
 struct face {
     face() {}
 
-    face(vector<vec> vertices, matrix<int> adjacency, double dist_squared, u32 color = 0xFFFFFF) {
-        for (vec p : vertices) {
-           this->vertices.push_back(p);
-        }
-        this->nvertices = vertices.size();
-
+    face(
+        vector<vec> vertices_projected,
+        vector<vec> vertices_real,
+        vec midpoint,
+        double dist_squared,
+        matrix<int> adjacency, 
+        void* mesh,
+        u32 color = 0xFFFFFF
+    ) {
+        this->vertices_projected = vertices_projected;
+        this->vertices_real = vertices_real;
         this->color = color;
-        this->dist_squared = dist_squared;
         this->adjacency = adjacency;
+        this->dist_squared = dist_squared;
+        this->midpoint = midpoint;
+        this->mesh = mesh;
+        this->nvertices = vertices_projected.size();
+    }
+
+    vec surface_normal() {
+        vec v1 = this->vertices_real[1] - this->vertices_real[0];
+        vec v2 = this->vertices_real[3] - this->vertices_real[0];
+
+        vec surface_normal = R3::cross_prod(v2, v1);
+
+        return surface_normal * pow(R3::norm(surface_normal), -1);
+
     }
 
     u32 color;
     double dist_squared;
     matrix<int> adjacency;
-    vector<vec> vertices;
+    vector<vec> vertices_projected;
+    vector<vec> vertices_real;
+    vec midpoint;
     int nvertices;
+    void* mesh;
 };
 
 /*Face comprised of n vertices, to be used for reference inside a mesh object.*/
@@ -80,7 +101,7 @@ public:
     wiremesh operator *= (mat T);
 
     vec get_pos() { return this->pos; }
-    void set_pos(vec v) { *this += v - this->pos; }
+    void mov_to(vec v) { *this += v - this->pos; this->pos = v; }
     int size() { return this->vertices.size(); };
 
     matrix<int> adjacency_matrix;
@@ -96,8 +117,9 @@ private:
 class light {
 public:
     light() {}
-    light(vec pos, double strength) {
-        this->pos = pos;
+    light(vec pos, double strength, u32 color = 0xFFFFFF) {
+        this->color = color;
+        this->source = pos;
         this->strength = strength;
     }
 
@@ -106,13 +128,19 @@ public:
     * @param dist [out] gives distance from light source to contact point
     */
     vec process_ray(vec contact_point, double* dist) {
-        vec ray = contact_point - pos;
+        vec ray = contact_point - this->source;
         *dist = R3::norm(ray);
         return ray * (1 / (*dist));
     }
 
-    vec pos;
+    vec get_source(){return this->source;}
+    void set_pos(vec v) { this->source = v; }
+
     double strength;
+    u32 color;
+private:
+    vec source;
+
 
 };
 
@@ -126,6 +154,7 @@ public:
 
     /* ---------- RENDERING PIPELINE OPERATIONS ----------- */
     edge process_edge(vec v1, vec v2, double dist_squared, u32 color = 0xFFFFFF);
+    face process_face(face_internal facedata,wiremesh* pmesh);
     void process_meshes();
 
     /* ---------- OTHER ---------- */
@@ -159,6 +188,7 @@ public:
     void set_scale(double scale);
     void transform(mat T);
     void affine_transform(mat T);
+
     template<typename func>
     void transform(func F);
 

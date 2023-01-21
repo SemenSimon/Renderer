@@ -55,16 +55,13 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     ShowWindow(hwnd, nCmdShow);
     GetClipCursor(&win.c_clip_old);
 
-    //surface s1(9,20);
-    //s1.set_pos({ 0,0,0 });
-    //win.rframe.add_mesh(&s1.mesh);
-
-    //sphere sph1(20, 4);
-    //win.rframe.add_mesh(&sph1.mesh);
-
+    surface s1(9,20);
+    s1.set_pos({ 0,0,0 });
+    win.rframe.add_mesh(&s1.mesh);
     for (obj_3d* ob : win.objects) {
         win.rframe.add_mesh(&(ob->mesh));
     }
+
      
     /**************** main run loop *****************/
     bool running = true;
@@ -82,17 +79,16 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
         }
 
         auto f = [&](double x, double y) {
-            return 15*exp(-pow(x+sin(win.time()), 2) - pow(y-cos(win.time()), 2));
+            double circ_r=64;
+            double r_sq = pow(x, 2) + pow(y, 2);
+            return sqrtf((circ_r- r_sq)*(r_sq < circ_r) + 1);
         };
 
         for (cube* C : win.random_cubes) {
-            C->affine_transform(R3::rotate_intr(PI / 128, 0, 0));
+            //C->affine_transform(R3::rotate_intr(PI / 1024, 0, 0));
         }
+       
 
-        //sph1.affine_transform(R3::rotate_intr(PI / 128, 0, 0));
-
-        win.LIGHT.pos = { 100*cos(3*win.time()),100*sin(3*win.time()), 200};
-        
         //update shit
         win.update_cam();
         win.draw_screen();
@@ -178,18 +174,18 @@ LRESULT RenderWindow::handle_create() {
     this->pixel_mem = (u32*)memory;
 
     this->screen = draw_device(pixel_mem, CLIENT_WIDTH, CLIENT_HEIGHT,100);
-    this->cam = camera({ 0.5,0.5,-1 }, { -300,-300,50 });
+    this->cam = camera({ 0.5,0.5,0 }, { -300,-300,50 });
     this->rframe = vertex_shader(this->screen, this->cam);
 
     this->framerate = 120;
     this->FOV = 90;
 
-    this->LIGHT = light({ 0, 0, 100 }, 20000);
+    this->LIGHT = light({ -60, -50, 20}, 1000);
     this->rframe.add_light(&LIGHT);
 
     //a bunch of shapes because it's cool
     {
-        vector<int> bounds = {5,5, 1};
+        vector<int> bounds = {5,5, 2};
         int cube_size = 30;
     
         for (int i = -bounds[0]; i < bounds[0]; i++) {
@@ -198,10 +194,10 @@ LRESULT RenderWindow::handle_create() {
                    vec pos = vec({ (double)i, (double)j, (double)k }) * cube_size;
                    double yes = (double)(rand() % 100) / 100;
     
-                   if (yes > 0.5) {
+                   if (yes > 0.98) {
                        cube* C = new cube(cube_size,pos);
-                       random_cubes.push_back(C);
-                       this->objects.push_back(C);
+                       //random_cubes.push_back(C);
+                       //this->objects.push_back(C);
                    }
                 }        
             }
@@ -269,13 +265,15 @@ LRESULT RenderWindow::draw_screen()
     //}
 
     //little xy axes
-    this->rframe.draw_line(zero, e[0], RED);
-    this->rframe.draw_line(zero, e[1], GREEN);
-    this->rframe.draw_line(zero, e[2], BLUE);
+    //this->rframe.draw_line(zero, e[0], RED);
+    //this->rframe.draw_line(zero, e[1], GREEN);
+    //this->rframe.draw_line(zero, e[2], BLUE);
 
     //crosshair
     this->screen.draw_line_raw(pt(CLIENT_WIDTH / 2 - 20, CLIENT_HEIGHT / 2), pt(CLIENT_WIDTH / 2 + 20, CLIENT_HEIGHT / 2), 0x33FFFF);
     this->screen.draw_line_raw(pt(CLIENT_WIDTH / 2, CLIENT_HEIGHT / 2 - 20), pt(CLIENT_WIDTH / 2, CLIENT_HEIGHT / 2 + 20), 0x33FFFF);
+
+    this->screen.draw_circ(cam.proj(LIGHT.get_source()), 20);
 
     //alert 
     if (show_alert) {
@@ -487,6 +485,10 @@ LRESULT RenderWindow::update_cam() {
     if (key_presses[VK_SPACE]) {
         vcam_real = { vcam_real[0][0], vcam_real[1][0],1 };
     }
+    if (key_presses[VK_SHIFT]) {
+        vcam_real = { vcam_real[0][0], vcam_real[1][0],-1 };
+    }
+
     //handle camera motion upon collision
     if (colliding) { 
         show_alert = true; 

@@ -40,6 +40,10 @@ public:
 		return this->cam_plane;
 	}
 
+	mat R2_proj() {
+		return this->cam_plane.map_lower_dim();
+	}
+
 
 	/*
 	* Finds the intersection of the camera plane and the line from the focal point to v, then

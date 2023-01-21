@@ -80,7 +80,7 @@
     <ClCompile Include="window.cpp">
       <Filter>Source Files\render_window</Filter>
     </ClCompile>
-    <ClCompile Include="draw_device.cpp">
+    <ClCompile Include="draw_device.hpp">
       <Filter>Source Files\render_window</Filter>
     </ClCompile>
     <ClCompile Include="camera.cpp">

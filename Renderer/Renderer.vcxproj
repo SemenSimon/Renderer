@@ -147,7 +147,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="camera.cpp" />
-    <ClCompile Include="draw_device.cpp" />
+    <ClCompile Include="draw_device.hpp" />
     <ClCompile Include="vertex_shader.cpp" />
     <ClCompile Include="window.cpp" />
   </ItemGroup>

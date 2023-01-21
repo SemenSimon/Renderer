@@ -21,6 +21,18 @@ static u32 darken(u32 color,double factor) {
     return R|G|B;
 }
 
+static u32 compute_light_color(u32 light_color, u32 surface_color) {
+    double R_absorb = (double)(get_RGB(surface_color, RED)) /   ((double)(0xFF));
+    double G_absorb = (double)(get_RGB(surface_color, GREEN)) / ((double)(0xFF));
+    double B_absorb = (double)(get_RGB(surface_color, BLUE)) /  ((double)(0xFF));
+
+    u32 R_new = (u32)((double)get_RGB(light_color, RED)   * R_absorb  );
+    u32 G_new = (u32)((double)get_RGB(light_color, GREEN) * G_absorb  );
+    u32 B_new = (u32)((double)get_RGB(light_color, BLUE)  * B_absorb  );
+
+    return (R_new << 16) | (G_new << 8) | (B_new);
+}
+
 /* for an adjacency matrix A, links i-th and j-th nodes by setting (i,j)-th and
 (j,i)-th entries to 1*/
 void link(int i, int j, matrix<int>* A) {
@@ -42,10 +54,8 @@ static vec centroid(vector<vec> vertices) {
         temp = temp + vertices[i];
     }
 
-    return temp * pow((double)vertices.size(), -1);
+    return temp * (1/(double)vertices.size());
 }
-
-
 
 bigint factorial(int x) {
     bigint val = x;
@@ -136,19 +146,27 @@ wiremesh::wiremesh(vector<vec> vertices, matrix<int> adjacency_matrix) {
         //partition of adjacency matrix corresponding to a particular combination of vertices
         matrix<int> adjacency = this->adjacency_matrix.select(vertex_combos[i], vertices_per_face);
 
-        //vector full of ones
-        vector<int> ones(vertices_per_face); for (int& x : ones) x = 1;
-        matrix<int> connections_per_vertex = adjacency * ones;
-
-        for (int k = 0; k < vertices_per_face; k++) {
-            if (connections_per_vertex[k][0] != 2) {
-                break;
-            }
-            if (k == vertices_per_face - 1) {
-                this->faces.push_back(face_internal(vertex_combos[i], vertices_per_face, adjacency));
+        //sum each row of adjacency matrix to get connections for each vertex
+        vector<int> connections_per_vertex(vertices_per_face);
+        for (int j = 0; j < vertices_per_face; j++) {
+            for (int k = 0; k < vertices_per_face; k++) {
+                connections_per_vertex[j] += adjacency[j][k];
             }
         }
+        
+        auto add_if_face = [&]() {
+            for (int k = 0; k < vertices_per_face; k++) {
+                if (connections_per_vertex[k] != 2) {
+                    return;
+                }
+            }
+            this->faces.push_back(face_internal(vertex_combos[i], vertices_per_face, adjacency));
+            return;
+        };
+        add_if_face();
     }
+
+    delete vertex_combos;
 }
 
 inline wiremesh wiremesh::operator +=(const vec& v) {
@@ -207,9 +225,25 @@ edge vertex_shader::process_edge(vec v1, vec v2, double dist_squared, u32 color)
     return edge(v1, v2, dist_squared, color);
 }
 
+face vertex_shader::process_face(face_internal facedata,wiremesh* pmesh)
+{
+    vec normal = this->cam->get_normal();
+    vec clip_point = this->cam->get_focal_point() + normal;
+    realnum foc_dist = this->cam->get_foc_dist();
+    int nvertices = facedata.num_vertices;
+
+    bool* vertex_is_behind = new bool(nvertices);
+
+    for (int i = 0; i < nvertices; i++) {
+        vertex_is_behind[i] = R3::ip(pmesh->vertices[facedata.vertex_indices[i]] - clip_point, normal);
+    }
+    delete vertex_is_behind;
+    return face();
+}
+
 void vertex_shader::process_meshes()
 {
-    double render_dist = 2000;
+    //double render_dist = 2000;
     vec focal_point = this->cam->get_focal_point();
 
     unordered_map<wiremesh*, vector<edge>> mesh_edge_map;
@@ -243,8 +277,6 @@ void vertex_shader::process_meshes()
             }
         }
 
-        vec n = cam->get_normal();
-
         for (face_internal facedata : pmesh->faces) {
             int npoints = facedata.num_vertices;
 
@@ -257,28 +289,11 @@ void vertex_shader::process_meshes()
                 vertices[i] = pmesh->vertices[facedata.vertex_indices[i]];
             }
 
-            vec midpoint = centroid(vertices) - focal_point;
-            double dist_squared = R3::ip(midpoint, midpoint);
+            vec midpoint = centroid(vertices);
+            vec midpoint_to_cam = midpoint - focal_point;
+            double dist_squared = R3::ip(midpoint_to_cam, midpoint_to_cam);
 
-            //handle shading
-            vec v1 = vertices[1] - vertices[0];
-            vec v2 = vertices[2] - vertices[0];
-
-            vec surface_normal = R3::cross_prod(v1,v2);
-            double brightness = 0;
-
-            for (light* L : this->lights) {
-                double dist;
-                vec light_ray = L->process_ray(midpoint+focal_point, & dist);
-
-                brightness +=( R3::ip(surface_normal, light_ray)*L->strength )/ (R3::norm(surface_normal)*pow(dist,2));
-            }
-
-            u32 color = darken(pmesh->color, abs(brightness));
-
-            if (dist_squared != -1) {
-                faces.push_back(face(projected_vertices,facedata.adjacency,dist_squared,color));
-            }
+            faces.push_back(face(projected_vertices,vertices,midpoint,dist_squared,facedata.adjacency,pmesh,pmesh->color));
         }
        
         mesh_face_map.insert({ pmesh,faces });
@@ -305,13 +320,59 @@ void vertex_shader::process_meshes()
     qsort(all_faces.data(),all_faces.size(),sizeof(face*), comp_face);
 
     for (face* F : all_faces) {
-        //vector<vec> projected_vertices(E.nvertices);
-        //
-        //for (int i = 0; i < E.nvertices; i++) {
-        //    projected_vertices[i] = cam->proj(E.vertices[i]);
+        //handle shading
+     
+        vec surface_normal = F->surface_normal();
+
+        //ensure surface normal points outwards from shape. 
+        //if (R3::ip(surface_normal,F->midpoint - ((wiremesh*)(F->mesh))->get_pos()) < 0) {
+            surface_normal = surface_normal * -1;
         //}
-        //
-        ddev->draw_quadrilateral(F->adjacency, F->vertices, F->color);
+        
+        //incredibly taxing shader
+        auto smooth_shader = [&](int x, int y) {
+            //sends point to R3 on camera plane
+            vec camera_plane_pos = this->cam->R2_proj().t() * vec({(double)x,(double)y}) + cam->get_pos();
+            
+            vec point_on_face = R3::line_plane_intersect(
+                camera_plane_pos,
+                camera_plane_pos - focal_point,
+                F->vertices_real[0],
+                surface_normal
+            );
+            
+            u32 light_total = 0;
+            for (light* L : this->lights) {
+                double dist;
+                vec light_ray = L->process_ray(point_on_face, &dist);
+                dist = dist / L->strength;
+                double power = (1 / pow(1 + dist, 2));
+                double light_level = (R3::ip(surface_normal, light_ray)*power);
+                double brightness = light_level *(light_level < 0);
+
+                light_total += darken(L->color, brightness * -1); 
+            }   
+            return compute_light_color(light_total, F->color);
+        };   
+
+        //cheap shader
+        double brightness = 0;
+        for (light* L : this->lights) {
+            double dist;
+            vec light_ray = L->process_ray(F->midpoint, & dist);
+            double light_level = (R3::ip(surface_normal, light_ray) * (1 / pow(1 + dist / L->strength, 2)));
+            brightness += light_level * (light_level < 0);
+        }
+        u32 face_color = darken(F->color, brightness*-1);
+
+        auto solid_shader = [&](int x, int y) {
+            return face_color;
+        };
+
+        //draw the face
+        ddev->draw_quadrilateral(F->adjacency, F->vertices_projected, smooth_shader);
+        ddev->draw_line(cam->proj(F->midpoint), cam->proj(F->midpoint + surface_normal * 10), 0x0000FF);
+        
 
         //ddev->draw_line(cam->proj(E.vertices[0]), cam->proj(E.vertices[2]), E.color);
     }
@@ -325,7 +386,7 @@ void vertex_shader::draw_line(vec v1, vec v2, u32 color)
 
 //SHAPES
 void obj_3d::set_pos(vec new_pos) { 
-    mesh.set_pos(new_pos); 
+    mesh.mov_to(new_pos); 
     this->pos = new_pos;
 }
 
@@ -405,7 +466,7 @@ cube::cube(realnum side_length, vec pos){
     }
 
     this->mesh = wiremesh(vertices, adjacency);
-    this->mesh.set_pos(pos);
+    this->mesh.mov_to(pos);
     this->pos = mesh.get_pos();
     this->side_length = side_length;
 }
@@ -469,7 +530,7 @@ sphere::sphere(realnum r, int res, vec pos) {
     }
     
     this->mesh = wiremesh(vertices, adjacency);
-    this->mesh.set_pos(pos);
+    this->mesh.mov_to(pos);
     this->pos = mesh.get_pos();
 
 }

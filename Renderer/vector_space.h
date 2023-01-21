@@ -104,7 +104,7 @@ public:
 	static inline elem line_plane_intersect(elem line_start, elem line_dir, elem plane_pos, elem plane_normal) {
 		field dot = ip(line_dir, plane_normal);
 		bool is_orthogonal = (dot == 0);
-		return (line_start + line_dir * (ip(plane_pos - line_start, plane_normal) / (dot + is_orthogonal)))*(!is_orthogonal);
+		return (line_start + line_dir * (ip(plane_pos - line_start, plane_normal)* pow(dot + is_orthogonal,-1)))*(!is_orthogonal);
 	}
 	
 	/* 
