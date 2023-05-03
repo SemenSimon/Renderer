@@ -6,7 +6,7 @@ In the near future, I plan on recreating this using OpenGL, as the current solut
 # Examples  
 Each of these executables is an old build.  To move the camera, use WASD + SPACE/SHIFT.  Please note that these are not stable in any way, shape, or form, so be prepared for potential weirdness.
 
-**cool shape:** This is just a cool shape I made by applying a vector field to a sphere.  
+**cool shape:** This is just a cool shape I made by transforming a sphere.  
 
 **cube jumping:** I was playing around with collision and made a little game-like thing where you can jump on and run into a bunch of cubes.  
 
