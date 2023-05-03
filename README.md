@@ -4,7 +4,7 @@ As a hobby project, I wanted to try my hand at creating a simplified 3D renderin
 In the near future, I plan on recreating this using OpenGL, as the current solution is incredibly inefficient.  Pretty much everything I've done will get a full rework.
 
 # Examples  
-Each of these executables is an old build of this project, showing a different aspect.  To move the camera, use WASD + SPACE/SHIFT.  Please note that these are not stable in any way, shape, or form, so be prepared for potential weirdness.
+Each of these executables is an old build of this project.  To move the camera, use WASD + SPACE/SHIFT.  Please note that these are not stable in any way, shape, or form, so be prepared for potential weirdness.
 
 **cool shape:** This is just a cool shape I made by applying a vector field to a sphere.  
 
