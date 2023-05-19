@@ -1,5 +1,5 @@
 # What is this?
-As a hobby project, I wanted to try my hand at creating a simplified 3D rendering pipeline, so I used some tools from the Win32 API to create a blank window on which I could edit pixel colors.  From scratch, I developed the tools required for everything here, from a linear algebra library to the functions for drawing 2D shapes.  
+As a hobby project, I wanted to try my hand at creating a simplified 3D rendering pipeline, so I used some tools from the Win32 API to create a blank window on which I could edit pixel colors.  From scratch, I developed the tools required for everything here, from some linear algebra stuff to the functions for drawing 2D shapes.  
 
 In the near future, I plan on recreating this using OpenGL, as the current solution is incredibly inefficient.  Pretty much everything I've done will get a full rework.
 
