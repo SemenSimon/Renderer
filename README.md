@@ -1,7 +1,7 @@
 # What is this?
 As a hobby project, I wanted to try my hand at creating a simplified 3D rendering pipeline, so I used some tools from the Win32 API to create a blank window on which I could edit pixel colors.  From scratch, I developed the tools required for everything here, from some linear algebra stuff to the functions for drawing 2D shapes.  
 
-In the near future, I plan on recreating this using OpenGL, as the current solution is incredibly inefficient.  Pretty much everything I've done will get a full rework.
+In the near future, I plan on recreating this using OpenGL, as the current solution runs on the CPU and is  incredibly limited.  Pretty much everything I've done will get a full rework.
 
 # Examples  
 Each of these executables is an old build.  To move the camera, use WASD + SPACE/SHIFT.  Please note that these are not stable in any way, shape, or form, so be prepared for potential weirdness.
