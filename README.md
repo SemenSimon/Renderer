@@ -14,6 +14,6 @@ Each of these executables is an old build.  To move the camera, use WASD + SPACE
 
 **wave:** I made this by overlapping a bunch of 2D wave functions on a surface.  
 
-**basic shading:**  This version draws the faces for a bunch of cubes and uses a very basic shading technique to color them.  There are still some issues with calculating the surface normals correctly, and I have not yet finished the clipping for faces.  
+**basic shading:**  This version draws the faces for a bunch of cubes and uses a flat shading techniques to draw them.  There are still some issues with calculating the surface normals correctly, and I have not yet finished the clipping for faces.  
 
 *Note:* The program with attempt to draw an infinitely large quadrilateral and crash if the camera plane intersects a cube, so maybe avoid doing that.   
