@@ -1,7 +1,7 @@
 # What is this?
+*Note:* I am no longer working on this project; I made a better renderer [here](https://github.com/ebajec/general-visualizer)
 As a hobby project, I wanted to try my hand at creating a simplified 3D rendering pipeline, so I used some tools from the Win32 API to create a blank window on which I could edit pixel colors.  From scratch, I developed the tools required for everything here, from some linear algebra stuff to the functions for drawing 2D shapes.  
 
-I made a better one with OpenGL.
 # Examples  
 Each of these executables is an old build.  To move the camera, use WASD + SPACE/SHIFT.  Please note that these are not stable in any way, shape, or form, so be prepared for potential weirdness.
 
