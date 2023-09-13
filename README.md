@@ -1,5 +1,5 @@
 # What is this?
-*NOTE:* I am no longer working on this project; I made a better renderer [here](https://github.com/ebajec/general-visualizer).
+*NOTE:* I am no longer working on this project; I made a better one [here](https://github.com/ebajec/general-visualizer).
 
 As a hobby project, I wanted to try my hand at creating a simplified 3D rendering pipeline, so I used some tools from the Win32 API to create a blank window on which I could edit pixel colors.  From scratch, I developed the tools required for everything here, from some linear algebra stuff to the functions for drawing 2D shapes.  
 
