@@ -1,7 +1,7 @@
-# What is this?
-*NOTE:* I am no longer working on this project; I made a better one [here](https://github.com/ebajec/general-visualizer).
+# renderer-old
+*Note:* I am no longer working on this, just leaving it up.
 
-As a hobby project, I wanted to try my hand at creating a simplified 3D rendering pipeline, so I used some tools from the Win32 API to create a blank window on which I could edit pixel colors.  From scratch, I developed the tools required for everything here, from some linear algebra stuff to the functions for drawing 2D shapes.  
+As a hobby project, I wanted to make a renderer, so I used the Windows API to make one from absolute scratch.   
 
 # Examples  
 Each of these executables is an old build.  To move the camera, use WASD + SPACE/SHIFT.  Please note that these are not stable in any way, shape, or form, so be prepared for potential weirdness.
@@ -12,8 +12,8 @@ Each of these executables is an old build.  To move the camera, use WASD + SPACE
 
 *NOTE:* There is a strange bug I couldn't fix where you pass through the first cube if you don't move before falling on it.  
 
-**wave:** I made this by overlapping a bunch of 2D wave functions on a surface.  
+**wave:** Cool wavy thing that looks cool.  
 
-**basic shading:**  This version draws the faces for a bunch of cubes and uses a flat shading techniques to draw them.  There are still some issues with calculating the surface normals correctly, and I have not yet finished the clipping for faces.  
+**basic shading:**  This version draws the faces for a bunch of cubes and uses a flat shading techniques to draw them.
 
 *NOTE:* The program with attempt to draw an infinitely large quadrilateral and crash if the camera plane intersects a cube, so maybe avoid doing that.   
