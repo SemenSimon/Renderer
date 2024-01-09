@@ -16,4 +16,4 @@ Each of these executables is an old build.  To move the camera, use WASD + SPACE
 
 **basic shading:**  This version draws the faces for a bunch of cubes and uses a flat shading techniques to draw them.
 
-*NOTE:* The program with attempt to draw an infinitely large quadrilateral and crash if the camera plane intersects a cube, so maybe avoid doing that.   
+*NOTE:* The program with attempt to draw an infinitely large triangle and crash if the camera plane intersects a cube, because I did not add clipping.   
