@@ -1,7 +1,7 @@
 # renderer-old
-*Note:* I am no longer working on this, just leaving it up.
+*Note:* I am no longer working on this, just leaving it up.  It is made rather poorly.
 
-As a hobby project, I wanted to make a renderer, so I used the Windows API to make one from absolute scratch.   
+As a hobby project, I wanted to make a renderer, so I used the Windows API to make one from scratch.   
 
 # Examples  
 Each of these executables is an old build.  To move the camera, use WASD + SPACE/SHIFT.  Please note that these are not stable in any way, shape, or form, so be prepared for potential weirdness.
